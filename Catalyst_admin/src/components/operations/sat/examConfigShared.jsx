@@ -515,6 +515,76 @@ export function SubjectConfigCard({ config, onEdit }) {
   );
 }
 
+// ── Diagnostic pair card (Math + R&W grouped as one test) ────────────────────
+function SubjectMiniPanel({ label, config, onEdit, borderCls, headerCls }) {
+  if (!config) return (
+    <div className={`border-2 ${borderCls} rounded-[12px] overflow-hidden`}>
+      <div className={`px-3 py-2 ${headerCls}`}>
+        <p className="text-xs font-bold uppercase tracking-wider">{label}</p>
+      </div>
+      <div className="p-3 text-xs text-gray-400 italic">Not configured</div>
+    </div>
+  );
+  const m1 = config.module_1; const m2a = config.module_2_easy; const m2b = config.module_2_hard;
+  return (
+    <div className={`border-2 ${borderCls} rounded-[12px] overflow-hidden flex flex-col`}>
+      <div className={`px-3 py-2 ${headerCls} flex items-center justify-between`}>
+        <p className="text-xs font-bold uppercase tracking-wider">{label}</p>
+        <button onClick={() => onEdit(config)}
+          className="text-[10px] px-2 py-0.5 rounded bg-white/60 hover:bg-white text-gray-600 font-medium">
+          Edit
+        </button>
+      </div>
+      <div className="p-3 flex flex-col gap-2">
+        <div className="grid grid-cols-3 gap-1">
+          <div className="rounded-[8px] border border-gray-200 p-2 flex flex-col gap-0.5">
+            <p className="text-[9px] font-bold text-gray-500 uppercase">M1</p>
+            <p className="text-[11px] text-gray-700 font-semibold">{m1?.total_questions}Q</p>
+            <p className="text-[10px] text-gray-400">{m1?.time_limit_minutes}min</p>
+          </div>
+          <div className="rounded-[8px] border border-green-200 bg-green-50/40 p-2 flex flex-col gap-0.5">
+            <p className="text-[9px] font-bold text-green-600 uppercase">2a</p>
+            <p className="text-[11px] text-gray-700 font-semibold">{m2a?.total_questions}Q</p>
+            <p className="text-[10px] text-gray-400">{m2a?.time_limit_minutes}min</p>
+          </div>
+          <div className="rounded-[8px] border border-red-200 bg-red-50/40 p-2 flex flex-col gap-0.5">
+            <p className="text-[9px] font-bold text-red-600 uppercase">2b</p>
+            <p className="text-[11px] text-gray-700 font-semibold">{m2b?.total_questions}Q</p>
+            <p className="text-[10px] text-gray-400">{m2b?.time_limit_minutes}min</p>
+          </div>
+        </div>
+        {config.adaptive_threshold != null && (
+          <p className="text-[10px] text-gray-400">Threshold: {config.adaptive_threshold}%</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function DiagnosticPairCard({ seriesName, mathConfig, rwConfig, onEdit, type = 'diagnostic' }) {
+  const typeLabel = type === 'diagnostic' ? 'Diagnostic' : 'Mock';
+  const typeBadge = type === 'diagnostic' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700';
+  return (
+    <div className="bg-white rounded-[14px] border border-gray-200 p-5 flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="font-semibold text-gray-900 text-sm">{seriesName}</h3>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${typeBadge}`}>{typeLabel}</span>
+            <span className="text-[10px] text-gray-400">2 subjects · Adaptive format</span>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <SubjectMiniPanel label="Reading & Writing" config={rwConfig} onEdit={onEdit}
+          borderCls="border-blue-200" headerCls="bg-blue-50 text-blue-700" />
+        <SubjectMiniPanel label="Math" config={mathConfig} onEdit={onEdit}
+          borderCls="border-purple-200" headerCls="bg-purple-50 text-purple-700" />
+      </div>
+    </div>
+  );
+}
+
 // ── Practice config card ──────────────────────────────────────────────────────
 export function PracticeConfigCard({ config, onEdit }) {
   return (

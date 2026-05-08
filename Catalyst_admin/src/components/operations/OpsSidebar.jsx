@@ -27,29 +27,29 @@ const icons = {
 
 const NAV = [
   { section: 'DASHBOARD', items: [
-    { key: 'dashboard', label: 'Overview', path: '/operations/dashboard', icon: icons.dashboard },
-  ]},
+      { key: 'dashboard', label: 'Overview', path: '/operations/dashboard', icon: icons.dashboard },
+    ]},
   { section: 'MANAGEMENT', items: [
-    { key: 'mentors',  label: 'Mentors',  path: '/operations/mentors',  icon: icons.mentors,  color: '#7c3aed' },
-    { key: 'students', label: 'Students', path: '/operations/students', icon: icons.students, color: '#ec4899' },
-    { key: 'batches',  label: 'Batches',  path: '/operations/batches',  icon: icons.batches,  color: '#f59e0b' },
-  ]},
+      { key: 'mentors',  label: 'Mentors',  path: '/operations/mentors',  icon: icons.mentors,  color: '#7c3aed' },
+      { key: 'students', label: 'Students', path: '/operations/students', icon: icons.students, color: '#ec4899' },
+      { key: 'batches',  label: 'Batches',  path: '/operations/batches',  icon: icons.batches,  color: '#f59e0b' },
+    ]},
   { section: 'SAT TESTS', items: [
-    {
-      key: 'structured-tests',
-      label: 'Structured Tests',
-      icon: icons.structuredTests,
-      color: '#0891b2',
-      children: [
-        { key: 'diagnostic-tests', label: 'Diagnostic Tests', path: '/operations/sat-tests/diagnostic', icon: icons.diagnostic, color: '#0891b2' },
-        { key: 'practice-tests',   label: 'Practice Tests',   path: '/operations/sat-tests/practice',   icon: icons.practice,   color: '#10b981' },
-        { key: 'mock-tests',       label: 'Mock Tests',       path: '/operations/sat-tests/mock',       icon: icons.mock,       color: '#f59e0b' },
-      ],
-    },
-  ]},
+      {
+        key: 'structured-tests',
+        label: 'Structured Tests',
+        icon: icons.structuredTests,
+        color: '#0891b2',
+        children: [
+          { key: 'diagnostic-tests', label: 'Diagnostic Tests', path: '/operations/sat-tests/diagnostic', icon: icons.diagnostic, color: '#0891b2' },
+          { key: 'practice-tests',   label: 'Practice Tests',   path: '/operations/sat-tests/practice',   icon: icons.practice,   color: '#10b981' },
+          { key: 'mock-tests',       label: 'Mock Tests',       path: '/operations/sat-tests/mock',       icon: icons.mock,       color: '#f59e0b' },
+        ],
+      },
+    ]},
   { section: 'RESOURCES', items: [
-    { key: 'sat-question-bank', label: 'Question Bank', path: '/operations/sat/question-bank', icon: icons.questionBank, color: '#7c3aed' },
-  ]},
+      { key: 'sat-question-bank', label: 'Question Bank', path: '/operations/sat/question-bank', icon: icons.questionBank, color: '#7c3aed' },
+    ]},
 ];
 
 export default function OpsSidebar({ collapsed, onToggle }) {
@@ -61,10 +61,10 @@ export default function OpsSidebar({ collapsed, onToggle }) {
   const isActive = (path) => location.pathname.startsWith(path);
 
   const isGroupActive = (item) =>
-    item.children?.some((c) => isActive(c.path)) ?? false;
+      item.children?.some((c) => isActive(c.path)) ?? false;
 
   const toggleGroup = (key) =>
-    setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
+      setOpenGroups((prev) => ({ ...prev, [key]: !prev[key] }));
 
   // Auto-expand group when navigating directly to a child route
   useEffect(() => {
@@ -81,179 +81,179 @@ export default function OpsSidebar({ collapsed, onToggle }) {
   }, [location.pathname]);
 
   return (
-    <aside
-      className="h-screen bg-white border-r border-gray-200 flex flex-col overflow-hidden shrink-0 sidebar-transition"
-      style={{ width: collapsed ? 72 : 260 }}
-    >
-      {/* Logo */}
-      <div className="h-16 px-4 flex items-center gap-2.5 border-b border-gray-100 shrink-0">
-        {collapsed ? (
-          <img src={catalystLogo} alt="Catalyst" className="w-9 h-9 object-cover object-left shrink-0" />
-        ) : (
-          <div className="flex-1 flex flex-col gap-0.5 overflow-hidden min-w-0">
-            <img src={catalystLogo} alt="Catalyst" className="h-[30px] w-auto object-contain object-left max-w-[150px]" />
-            <span className="text-[11px] text-ops-primary font-semibold pl-0.5">Operations</span>
-          </div>
-        )}
-        <button
-          className="w-7 h-7 rounded-lg flex items-center justify-center bg-gray-100 shrink-0 ml-auto hover:bg-gray-200 transition-colors"
-          onClick={onToggle}
-          title={collapsed ? 'Expand' : 'Collapse'}
-        >
+      <aside
+          className="h-screen bg-white border-r border-gray-200 flex flex-col overflow-hidden shrink-0 sidebar-transition"
+          style={{ width: collapsed ? 72 : 260 }}
+      >
+        {/* Logo */}
+        <div className="h-16 px-4 flex items-center gap-2.5 border-b border-gray-100 shrink-0">
+          {collapsed ? (
+              <img src={catalystLogo} alt="Catalyst" className="w-9 h-9 object-cover object-left shrink-0" />
+          ) : (
+              <div className="flex-1 flex flex-col gap-0.5 overflow-hidden min-w-0">
+                <img src={catalystLogo} alt="Catalyst" className="h-[30px] w-auto object-contain object-left max-w-[150px]" />
+                <span className="text-[11px] text-ops-primary font-semibold pl-0.5">Operations</span>
+              </div>
+          )}
+          <button
+              className="w-7 h-7 rounded-lg flex items-center justify-center bg-gray-100 shrink-0 ml-auto hover:bg-gray-200 transition-colors"
+              onClick={onToggle}
+              title={collapsed ? 'Expand' : 'Collapse'}
+          >
           <span className="w-4 h-4 block text-gray-400">
             {collapsed ? icons.chevRight : icons.chevLeft}
           </span>
-        </button>
-      </div>
+          </button>
+        </div>
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-3">
-        {NAV.map((section) => (
-          <div key={section.section} className="mb-2">
-            {!collapsed && (
-              <span className="block text-[10px] font-bold text-ops-primary uppercase tracking-[0.8px] px-5 pt-2 pb-1">
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto py-3">
+          {NAV.map((section) => (
+              <div key={section.section} className="mb-2">
+                {!collapsed && (
+                    <span className="block text-[10px] font-bold text-ops-primary uppercase tracking-[0.8px] px-5 pt-2 pb-1">
                 {section.section}
               </span>
-            )}
-            {section.items.map((item) => {
-              /* ── Group item (has children) ── */
-              if (item.children) {
-                const groupActive = isGroupActive(item);
-                const isOpen = openGroups[item.key];
-                return (
-                  <div key={item.key}>
-                    <button
-                      className={`w-full flex items-center gap-2.5 px-3.5 py-[9px] my-px rounded-[10px] transition-colors ${
-                        groupActive ? 'bg-ops-lighter' : 'hover:bg-gray-50'
-                      } ${collapsed ? 'justify-center' : 'justify-start'}`}
-                      onClick={() => !collapsed && toggleGroup(item.key)}
-                      title={collapsed ? item.label : ''}
-                    >
+                )}
+                {section.items.map((item) => {
+                  /* ── Group item (has children) ── */
+                  if (item.children) {
+                    const groupActive = isGroupActive(item);
+                    const isOpen = openGroups[item.key];
+                    return (
+                        <div key={item.key}>
+                          <button
+                              className={`w-full flex items-center gap-2.5 px-3.5 py-[9px] my-px rounded-[10px] transition-colors ${
+                                  groupActive ? 'bg-ops-lighter' : 'hover:bg-gray-50'
+                              } ${collapsed ? 'justify-center' : 'justify-start'}`}
+                              onClick={() => !collapsed && toggleGroup(item.key)}
+                              title={collapsed ? item.label : ''}
+                          >
                       <span
-                        className="w-8 h-8 flex items-center justify-center rounded-lg shrink-0"
-                        style={{
-                          color: groupActive ? '#7c3aed' : (item.color || '#6b7280'),
-                          background: groupActive ? 'rgba(124,58,237,0.12)' : 'transparent',
-                        }}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg shrink-0"
+                          style={{
+                            color: groupActive ? '#7c3aed' : (item.color || '#6b7280'),
+                            background: groupActive ? 'rgba(124,58,237,0.12)' : 'transparent',
+                          }}
                       >
                         {item.icon}
                       </span>
-                      {!collapsed && (
-                        <>
+                            {!collapsed && (
+                                <>
                           <span
-                            className={`text-sm whitespace-nowrap flex-1 text-left ${
-                              groupActive ? 'text-ops-primary font-semibold' : 'text-gray-700 font-normal'
-                            }`}
+                              className={`text-sm whitespace-nowrap flex-1 text-left ${
+                                  groupActive ? 'text-ops-primary font-semibold' : 'text-gray-700 font-normal'
+                              }`}
                           >
                             {item.label}
                           </span>
-                          <span
-                            className="w-4 h-4 block text-gray-400 shrink-0 transition-transform duration-200"
-                            style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                          >
+                                  <span
+                                      className="w-4 h-4 block text-gray-400 shrink-0 transition-transform duration-200"
+                                      style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                                  >
                             {icons.chevDown}
                           </span>
-                        </>
-                      )}
-                    </button>
+                                </>
+                            )}
+                          </button>
 
-                    {/* Children — only visible when sidebar is expanded and group is open */}
-                    {!collapsed && isOpen && (
-                      <div className="pl-4 mt-0.5 mb-1">
-                        {item.children.map((child) => {
-                          const active = isActive(child.path);
-                          return (
-                            <button
-                              key={child.key}
-                              className={`w-full flex items-center gap-2 px-3 py-[8px] my-px rounded-[10px] transition-colors ${
-                                active ? 'bg-ops-lighter' : 'hover:bg-gray-50'
-                              }`}
-                              onClick={() => navigate(child.path)}
-                            >
+                          {/* Children — only visible when sidebar is expanded and group is open */}
+                          {!collapsed && isOpen && (
+                              <div className="pl-4 mt-0.5 mb-1">
+                                {item.children.map((child) => {
+                                  const active = isActive(child.path);
+                                  return (
+                                      <button
+                                          key={child.key}
+                                          className={`w-full flex items-center gap-2 px-3 py-[8px] my-px rounded-[10px] transition-colors ${
+                                              active ? 'bg-ops-lighter' : 'hover:bg-gray-50'
+                                          }`}
+                                          onClick={() => navigate(child.path)}
+                                      >
                               <span
-                                className="w-7 h-7 flex items-center justify-center rounded-lg shrink-0"
-                                style={{
-                                  color: active ? '#7c3aed' : (child.color || '#6b7280'),
-                                  background: active ? 'rgba(124,58,237,0.12)' : 'transparent',
-                                }}
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg shrink-0"
+                                  style={{
+                                    color: active ? '#7c3aed' : (child.color || '#6b7280'),
+                                    background: active ? 'rgba(124,58,237,0.12)' : 'transparent',
+                                  }}
                               >
                                 {child.icon}
                               </span>
-                              <span
-                                className={`text-[13px] whitespace-nowrap flex-1 text-left ${
-                                  active ? 'text-ops-primary font-semibold' : 'text-gray-600 font-normal'
-                                }`}
-                              >
+                                        <span
+                                            className={`text-[13px] whitespace-nowrap flex-1 text-left ${
+                                                active ? 'text-ops-primary font-semibold' : 'text-gray-600 font-normal'
+                                            }`}
+                                        >
                                 {child.label}
                               </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
+                                      </button>
+                                  );
+                                })}
+                              </div>
+                          )}
+                        </div>
+                    );
+                  }
 
-              /* ── Regular item ── */
-              const active = isActive(item.path);
-              return (
-                <button
-                  key={item.key}
-                  className={`w-full flex items-center gap-2.5 px-3.5 py-[9px] my-px rounded-[10px] transition-colors ${
-                    active ? 'bg-ops-lighter' : 'hover:bg-gray-50'
-                  } ${collapsed ? 'justify-center' : 'justify-start'}`}
-                  onClick={() => navigate(item.path)}
-                  title={collapsed ? item.label : ''}
-                >
+                  /* ── Regular item ── */
+                  const active = isActive(item.path);
+                  return (
+                      <button
+                          key={item.key}
+                          className={`w-full flex items-center gap-2.5 px-3.5 py-[9px] my-px rounded-[10px] transition-colors ${
+                              active ? 'bg-ops-lighter' : 'hover:bg-gray-50'
+                          } ${collapsed ? 'justify-center' : 'justify-start'}`}
+                          onClick={() => navigate(item.path)}
+                          title={collapsed ? item.label : ''}
+                      >
                   <span
-                    className="w-8 h-8 flex items-center justify-center rounded-lg shrink-0"
-                    style={{
-                      color: active ? '#7c3aed' : (item.color || '#6b7280'),
-                      background: active ? 'rgba(124,58,237,0.12)' : 'transparent',
-                    }}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg shrink-0"
+                      style={{
+                        color: active ? '#7c3aed' : (item.color || '#6b7280'),
+                        background: active ? 'rgba(124,58,237,0.12)' : 'transparent',
+                      }}
                   >
                     {item.icon}
                   </span>
-                  {!collapsed && (
-                    <span
-                      className={`text-sm whitespace-nowrap flex-1 text-left ${
-                        active ? 'text-ops-primary font-semibold' : 'text-gray-700 font-normal'
-                      }`}
-                    >
+                        {!collapsed && (
+                            <span
+                                className={`text-sm whitespace-nowrap flex-1 text-left ${
+                                    active ? 'text-ops-primary font-semibold' : 'text-gray-700 font-normal'
+                                }`}
+                            >
                       {item.label}
                     </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
-
-      {/* Footer */}
-      <div className="px-3.5 py-3 border-t border-gray-100 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2.5 overflow-hidden">
-          <div className="w-[34px] h-[34px] rounded-full overflow-hidden shrink-0">
-            <BAvatar size={34} name={user?.name || 'Ops'} variant="beam" />
-          </div>
-          {!collapsed && (
-            <div className="overflow-hidden">
-              <div className="text-[13px] font-semibold text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px]">
-                {user?.name}
+                        )}
+                      </button>
+                  );
+                })}
               </div>
-              <div className="text-[11px] text-ops-primary font-medium">Operations</div>
+          ))}
+        </nav>
+
+        {/* Footer */}
+        <div className="px-3.5 py-3 border-t border-gray-100 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="w-[34px] h-[34px] rounded-full overflow-hidden shrink-0">
+              <BAvatar size={34} name={user?.name || 'Ops'} variant="beam" />
             </div>
-          )}
+            {!collapsed && (
+                <div className="overflow-hidden">
+                  <div className="text-[13px] font-semibold text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis max-w-[130px]">
+                    {user?.name}
+                  </div>
+                  <div className="text-[11px] text-ops-primary font-medium">Operations</div>
+                </div>
+            )}
+          </div>
+          <button
+              className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 shrink-0 hover:bg-gray-200 transition-colors"
+              onClick={() => { logout(); navigate('/'); }}
+              title="Logout"
+          >
+            <span className="w-[18px] h-[18px] block text-gray-500">{icons.logout}</span>
+          </button>
         </div>
-        <button
-          className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 shrink-0 hover:bg-gray-200 transition-colors"
-          onClick={() => { logout(); navigate('/'); }}
-          title="Logout"
-        >
-          <span className="w-[18px] h-[18px] block text-gray-500">{icons.logout}</span>
-        </button>
-      </div>
-    </aside>
+      </aside>
   );
 }
