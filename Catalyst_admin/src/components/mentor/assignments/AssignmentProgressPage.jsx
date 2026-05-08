@@ -55,6 +55,24 @@ function getMasteryLevel(pct) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// TEXT SANITIZER
+// Fixes Windows-1252 curly-quote bytes that arrive as Latin-1
+// control characters (U+0091–U+0097) and show as diamonds/boxes.
+// ─────────────────────────────────────────────────────────────
+function sanitizeText(text) {
+  if (!text) return text;
+  return text
+    .replace(//g, '‘') // left single quote
+    .replace(//g, '’') // right single quote / apostrophe
+    .replace(//g, '“') // left double quote
+    .replace(//g, '”') // right double quote
+    .replace(//g, '–') // en dash
+    .replace(//g, '—') // em dash
+    .replace(/�/g, "'")     // Unicode replacement character
+    .replace(/◆/g, "'");    // Black diamond used in some SAT content
+}
+
+// ─────────────────────────────────────────────────────────────
 // CHART COLOUR PALETTE
 // Matches the reference image (Office-style chart colours):
 //   Blue · Green · Orange · Pink · Yellow · Light-blue
@@ -790,7 +808,11 @@ export function StudentReportModal({ attempt, assignment, onClose, isStudentView
   const assignModule  = assignSection?.modules?.find((m) => m.number === activeModule);
   const meta          = SECTION_META[activeSection] || SECTION_META.rw;
 
-  const formatTime = (mins) => (!mins && mins !== 0) ? '—' : `${mins}m`;
+  const formatTime = (val) => {
+    if (val == null) return '—';
+    const mins = val > 300 ? Math.round(val / 60) : val; // convert seconds → minutes if needed
+    return `${mins}m`;
+  };
   const handleDownload = () => downloadReport(attempt, assignment, topicMastery, aiData);
 
   // Tab definitions — Charts and Topics only shown when topic data exists
@@ -1040,7 +1062,11 @@ export function StudentReportModal({ attempt, assignment, onClose, isStudentView
             <div className="flex items-center gap-4 px-4 py-3 rounded-xl text-sm" style={{ background: meta.bg }}>
               <span style={{ color: meta.accent }} className="font-bold">Module {activeModule}</span>
               <span className="text-gray-500 text-xs">
-                ⏱ {formatTime(moduleResult.timeTaken)} / {formatTime(assignModule.timeLimit)} used
+                ⏱ {formatTime(
+                  moduleResult.timeTaken ?? moduleResult.time_taken ?? moduleResult.timeUsed ?? moduleResult.time_used
+                )} / {formatTime(
+                  assignModule.timeLimit ?? assignModule.time_limit ?? assignModule.timeLimitMinutes ?? assignModule.time_limit_minutes
+                )} used
               </span>
               <span className="text-gray-500 text-xs">⭐ {moduleResult.score} / {moduleResult.maxScore} pts</span>
               <span className="text-gray-500 text-xs">{assignModule.questions.length} questions</span>
@@ -1079,11 +1105,11 @@ export function StudentReportModal({ attempt, assignment, onClose, isStudentView
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-semibold truncate"
                        style={{ color: notAnswered ? '#6b7280' : isCorrect ? '#065f46' : '#991b1b' }}>
-                      {q.title || 'Untitled question'}
+                      {sanitizeText(q.stem) || 'Untitled question'}
                     </p>
                     {q.topic && (
                       <span className="inline-flex mt-0.5 text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-2 py-0.5">
-                        {q.topic}
+                        {sanitizeText(q.topic)}
                       </span>
                     )}
                   </div>
@@ -1108,7 +1134,7 @@ export function StudentReportModal({ attempt, assignment, onClose, isStudentView
                 <div className="px-4 py-4 bg-white space-y-3">
                   {q.description && (
                     <div className="text-[13px] text-gray-700 leading-relaxed border-l-2 pl-3 border-gray-200"
-                         dangerouslySetInnerHTML={{ __html: q.description }} />
+                         dangerouslySetInnerHTML={{ __html: sanitizeText(q.description) }} />
                   )}
 
                   {/* Answer choices */}
@@ -1128,7 +1154,7 @@ export function StudentReportModal({ attempt, assignment, onClose, isStudentView
                             {letter}
                           </div>
                           <span className="text-[13px] flex-1" style={{ color }}>
-                            {q.choices?.[letter] || '—'}
+                            {sanitizeText(q['option_' + letter.toLowerCase()]) || '—'}
                           </span>
                           <div className="flex items-center gap-1 shrink-0">
                             {isStudentAnswer && <span className="text-[10px] font-bold" style={{ color }}>Student</span>}
@@ -1146,7 +1172,7 @@ export function StudentReportModal({ attempt, assignment, onClose, isStudentView
                       <div>
                         <p className="text-[11px] font-extrabold text-amber-700 uppercase tracking-wide mb-1">Explanation</p>
                         <div className="text-[12px] text-amber-800 leading-relaxed"
-                             dangerouslySetInnerHTML={{ __html: q.explanation }} />
+                             dangerouslySetInnerHTML={{ __html: sanitizeText(q.explanation) }} />
                       </div>
                     </div>
                   )}

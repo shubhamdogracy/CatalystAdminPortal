@@ -36,6 +36,26 @@ html, body, #root {
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ── SAT question content (HTML + KaTeX + SVG figures) ────── */
+.sat-content p           { margin-bottom: 0.5rem; }
+.sat-content p:last-child { margin-bottom: 0; }
+.sat-content strong, .sat-content b { font-weight: 600; }
+.sat-content em, .sat-content i     { font-style: italic; }
+.sat-content figure      { margin: 0.75rem 0; }
+.sat-content img         { max-width: 100%; height: auto; display: block; margin: 0.5rem 0; }
+.sat-content svg         { max-width: 100%; height: auto; }
+/* Hide screen-reader-only spans injected by CB */
+.sat-content .sr-only {
+  position: absolute !important;
+  width: 1px !important; height: 1px !important;
+  padding: 0 !important; margin: -1px !important;
+  overflow: hidden !important; clip: rect(0,0,0,0) !important;
+  white-space: nowrap !important; border: 0 !important;
+}
+/* KaTeX sizing inside table cells / compact containers */
+.sat-content .katex      { font-size: 1em; }
+.sat-content .katex-display { overflow-x: auto; margin: 0.25rem 0; }
+
 /* ── Animations ───────────────────────────────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }

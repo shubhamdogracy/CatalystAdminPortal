@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { satStudentService } from '../../../services/api';
+import MathContent from '../../common/MathContent';
+
+// Strip HTML tags to a plain text preview (used only for compact review lists)
+const stripHtml = (html = '') => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 
 // ── Helpers ──────────────────────────────────────────────────
 function fmtTime(secs) {
@@ -19,6 +23,15 @@ function buildPayload(questions, answers) {
 // ── Question display ─────────────────────────────────────────
 function QuestionView({ question, selected, onSelect, number, total }) {
   if (!question) return null;
+
+  const optMap = {
+    A: question.option_a,
+    B: question.option_b,
+    C: question.option_c,
+    D: question.option_d,
+  };
+  const isGridIn = question.format === 'grid_in';
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
@@ -27,41 +40,62 @@ function QuestionView({ question, selected, onSelect, number, total }) {
         </span>
         Question {number} of {total}
         {question.topic && <span className="ml-2 px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{question.topic}</span>}
+        {isGridIn && <span className="ml-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-600">Grid-In</span>}
       </div>
 
-      <p className="text-[15px] text-gray-900 font-medium leading-relaxed whitespace-pre-wrap">
-        {question.title}
-      </p>
+      {/* Stem — renders HTML, LaTeX math, and SVG figures */}
+      <MathContent
+        html={question.stem}
+        className="text-[15px] text-gray-900 leading-relaxed"
+      />
 
-      <div className="flex flex-col gap-2.5">
-        {['A', 'B', 'C', 'D'].map((opt) => {
-          const text       = question.choices?.[opt];
-          if (!text) return null;
-          const isSelected = selected === opt;
-          return (
-            <button
-              key={opt}
-              onClick={() => onSelect(opt)}
-              className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
-                isSelected
-                  ? 'border-indigo-500 bg-indigo-50'
-                  : 'border-gray-200 bg-white hover:border-indigo-200 hover:bg-gray-50'
-              }`}
-            >
-              <span
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-extrabold shrink-0 mt-0.5 ${
-                  isSelected ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-600'
+      {/* MCQ options */}
+      {!isGridIn && (
+        <div className="flex flex-col gap-2.5">
+          {['A', 'B', 'C', 'D'].map((opt) => {
+            const html = optMap[opt];
+            if (!html) return null;
+            const isSelected = selected === opt;
+            return (
+              <button
+                key={opt}
+                onClick={() => onSelect(opt)}
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all ${
+                  isSelected
+                    ? 'border-indigo-500 bg-indigo-50'
+                    : 'border-gray-200 bg-white hover:border-indigo-200 hover:bg-gray-50'
                 }`}
               >
-                {opt}
-              </span>
-              <span className={`text-sm leading-relaxed ${isSelected ? 'text-indigo-900 font-medium' : 'text-gray-700'}`}>
-                {text}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+                <span
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-extrabold shrink-0 mt-0.5 ${
+                    isSelected ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {opt}
+                </span>
+                <MathContent
+                  html={html}
+                  className={`text-sm leading-relaxed [&_p]:m-0 ${isSelected ? 'text-indigo-900 font-medium' : 'text-gray-700'}`}
+                />
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Grid-in input */}
+      {isGridIn && (
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-semibold text-gray-500">Your Answer</label>
+          <input
+            type="text"
+            value={selected || ''}
+            onChange={e => onSelect(e.target.value)}
+            placeholder="Type your answer…"
+            className="w-40 h-11 px-4 rounded-xl border-2 border-gray-200 text-sm font-mono focus:outline-none focus:border-indigo-400"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -185,7 +219,7 @@ function ResultsScreen({ m1, m2, subject, testName, onBack }) {
                     {q.is_correct ? '✓' : '✗'}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-600 truncate">{q.title || `Q${i + 1}`}</p>
+                    <p className="text-xs text-gray-600 truncate">{stripHtml(q.stem) || `Q${i + 1}`}</p>
                     <p className="text-[11px] text-gray-400 mt-0.5">
                       You: <strong>{q.selected || '—'}</strong>
                       {!q.is_correct && (
@@ -231,7 +265,7 @@ export default function SatTestPage() {
   // ── State ────────────────────────────────────────────────
   const [phase,      setPhase]      = useState('loading');
   // 'loading' | 'module1' | 'm1_done' | 'module2' | 'complete' | 'error'
-  const [testName,   setTestName]   = useState('SAT Practice Test');
+  const [testName] = useState('SAT Practice Test');
   const [subject,    setSubject]    = useState('');
   const [sessionId,  setSessionId]  = useState(null);
   const [questions,  setQuestions]  = useState([]);
@@ -368,7 +402,6 @@ export default function SatTestPage() {
 
   // ── Render phases ─────────────────────────────────────────
 
-  console.log(setTestName(("hello world")));
   if (phase === 'complete') {
     return (
       <ResultsScreen
