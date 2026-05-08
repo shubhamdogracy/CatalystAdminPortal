@@ -35,7 +35,6 @@ const NAV_SECTIONS = [
       { key: 'slots',         label: 'Slots',         path: '/mentor/slots',         icon: icons.slots,         color: '#0d9488' },
       { key: 'sessions',      label: 'Sessions',      path: '/mentor/sessions',      icon: icons.sessions,      color: '#0891b2' },
       { key: 'analytics',     label: 'Analytics',     path: '/mentor/analytics',     icon: icons.analytics,     color: '#7c3aed' },
-      { key: 'assignments',   label: 'Assignments',   path: '/mentor/assignments',   icon: icons.assignments,   color: '#f59e0b' },
       { key: 'communication', label: 'Communication', path: '/mentor/communication', icon: icons.communication, color: '#ec4899' },
     ],
   },

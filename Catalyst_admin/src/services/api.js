@@ -48,40 +48,6 @@ export const studentService = {
   grantAccess:  (id)            => req(`/students/${id}/grant-access`, { method: 'PUT' }),
 };
 
-export const assignmentService = {
-  getByMentor:   (mentorId)     => req(`/assignments?mentorId=${mentorId}`),
-  getById:       (id)           => req(`/assignments/${id}`),
-  getProgress:   (id)           => req(`/assignments/${id}/progress`),
-  create:        (payload)      => req('/assignments', { method: 'POST', body: JSON.stringify(payload) }),
-  update:        (id, payload)  => req(`/assignments/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
-  remove:        (id)           => req(`/assignments/${id}`, { method: 'DELETE' }),
-  setStatus:     (id, status)   => req(`/assignments/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
-  enrollBatches:  (id, batchIds) => req(`/assignments/${id}/enroll`, { method: 'POST', body: JSON.stringify({ batchIds }) }),
-  unenrollBatch:  (id, batchId)  => req(`/assignments/${id}/enroll/${batchId}`, { method: 'DELETE' }),
-};
-
-export const opsAssignmentService = {
-  getByOps:  (opsId)        => req(`/assignments?ownedBy=ops&opsId=${opsId}`),
-  getById:   (id)           => req(`/assignments/${id}`),
-  getProgress: (id)         => req(`/assignments/${id}/progress`),
-  create:    (payload)      => req('/assignments', { method: 'POST', body: JSON.stringify(payload) }),
-  update:    (id, payload)  => req(`/assignments/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
-  remove:    (id)           => req(`/assignments/${id}`, { method: 'DELETE' }),
-  setStatus: (id, status)   => req(`/assignments/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
-};
-
-// ── Student assignment service ───────────────────────────────
-// Used by the student portal to load assignments the student
-// is enrolled in, along with their own attempt data.
-export const studentAssignmentService = {
-  // Returns array of { assignment, myAttempt } for the student.
-  // Backend endpoint: GET /assignments/my?studentId=:id
-  getMyAssignments: (studentId) => req(`/assignments/my?studentId=${studentId}`),
-
-  // Fallback: fetch full progress and let the frontend filter.
-  // Backend endpoint: GET /assignments/:id/progress
-  getProgress: (id) => req(`/assignments/${id}/progress`),
-};
 
 // ── SAT Admin service ────────────────────────────────────────
 const reqFile = (url, formData) => {
@@ -120,21 +86,11 @@ export const satAdminService = {
   updatePracticeConfig: (id, payload)  => req(`/sat/admin/practice-configs/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
 };
 
-export const satStudentService = {
-  getAssignments: (studentId)             => req(`/sat/test/assignments?studentId=${studentId}`),
-  startSession:   (payload)               => req('/sat/test/start', { method: 'POST', body: JSON.stringify(payload) }),
-  submitModule1:  (sessionId, payload)    => req(`/sat/test/${sessionId}/module/1/submit`, { method: 'POST', body: JSON.stringify(payload) }),
-  getModule2:     (sessionId)             => req(`/sat/test/${sessionId}/module/2`),
-  submitModule2:  (sessionId, payload)    => req(`/sat/test/${sessionId}/module/2/submit`, { method: 'POST', body: JSON.stringify(payload) }),
-  getResults:     (sessionId)             => req(`/sat/test/${sessionId}/results`),
-};
-
 export const satMentorService = {
-  listTests:      ()              => req('/sat/mentor/exam-configs'),
-  assign:         (payload)       => req('/sat/mentor/assign', { method: 'POST', body: JSON.stringify(payload) }),
-  getAssignments: (params = {})   => { const qs = new URLSearchParams(params).toString(); return req(`/sat/mentor/assignments${qs ? `?${qs}` : ''}`); },
-  // Used by mentor to view a student's completed SAT results
-  getResults:     (id)            => req(`/sat/mentor/assignments/${id}/results`),
+  getStudentSessions:         (studentId) => req(`/sat/mentor/student/${studentId}/sessions`),
+  getStudentPracticeSessions: (studentId) => req(`/sat/mentor/student/${studentId}/practice-sessions`),
+  getSessionResults:          (sessionId) => req(`/sat/mentor/sessions/${sessionId}/results`),
+  getPracticeResults:         (sessionId) => req(`/sat/mentor/practice-sessions/${sessionId}/results`),
 };
 
 export const chatService = {

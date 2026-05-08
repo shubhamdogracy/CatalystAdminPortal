@@ -12,7 +12,14 @@
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(xargs grep -l \"satMentorService\\\\|satStudentService\")",
       "Bash(npx vite *)",
-      "Bash(xargs grep -l -i \"examconfig\\\\|exam-config\\\\|ExamConfig\")"
+      "Bash(xargs grep -l -i \"examconfig\\\\|exam-config\\\\|ExamConfig\")",
+      "Bash(grep -rn \"student\\\\|Student\" index.jsx App.jsx router.jsx --include=\"*.jsx\" --include=\"*.js\")",
+      "Bash(cat index.jsx)",
+      "Bash(Remove-Item -Path \"C:\\\\Users\\\\Shubham\\\\WebstormProjects\\\\catalyst_admin\\\\Catalyst_admin\\\\src\\\\components\\\\mentor\\\\assignments\\\\SatAssignTab.jsx\" -Force)",
+      "Bash(Remove-Item -Path \"C:\\\\Users\\\\Shubham\\\\WebstormProjects\\\\catalyst_admin\\\\Catalyst_admin\\\\src\\\\components\\\\mentor\\\\assignments\\\\AssignmentsPage.jsx\" -Force)",
+      "Bash(Remove-Item -Path \"C:\\\\Users\\\\Shubham\\\\WebstormProjects\\\\catalyst_admin\\\\Catalyst_admin\\\\src\\\\components\\\\student\" -Recurse -Force)",
+      "Bash(Write-Output \"Done\")",
+      "PowerShell(Remove-Item *)"
     ]
   }
 }

@@ -6,11 +6,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 
-const SAT_STATUS = {
-  pending:     { label: 'Not Started', color: '#6b7280', bg: '#f3f4f6', dot: '#9ca3af' },
-  in_progress: { label: 'In Progress', color: '#92400e', bg: '#fef3c7', dot: '#f59e0b' },
-  completed:   { label: 'Completed',   color: '#065f46', bg: '#d1fae5', dot: '#10b981' },
-};
+
+const SUBJ_LABEL = { math: 'Math', reading_writing: 'Reading & Writing' };
 
 const backIcon = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -649,6 +646,222 @@ function SatScoreModal({ session, assignment, onClose }) {
   );
 }
 
+// ── Collapsible SAT test section (diagnostic / mock / practice) ──
+function SatTestSection({ label, icon, accentColor, sessions, loading, onView, viewLoadingId }) {
+  const [expanded, setExpanded] = useState(false);
+  const completed = sessions.filter(s => s.status === 'complete').length;
+  return (
+    <div className="rounded-xl border border-gray-200 overflow-hidden">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center justify-between px-4 py-3.5 bg-white hover:bg-gray-50 transition-colors">
+        <div className="flex items-center gap-2.5">
+          <span className="text-base">{icon}</span>
+          <span className="text-sm font-semibold text-gray-700">{label}</span>
+          {!loading && sessions.length > 0 && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-500">
+              {completed}/{sessions.length}
+            </span>
+          )}
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+             className={`text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {expanded && (
+        <div className="border-t border-gray-100">
+          {loading ? (
+            <div className="py-8 flex items-center justify-center text-gray-400 text-sm gap-2">
+              <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin" />
+              Loading…
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="py-8 text-center text-sm text-gray-400">No {label.toLowerCase()} taken yet.</div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {sessions.map(s => {
+                const pct  = s.percentage ?? s.total_percentage ?? 0;
+                const name = s.exam_config_id?.name || s.practice_config_id?.name || 'Test';
+                const subj = SUBJ_LABEL[s.exam_config_id?.subject || s.practice_config_id?.subject] || '';
+                const date = s.created_at
+                  ? new Date(s.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                  : '';
+                return (
+                  <div key={s._id} className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base"
+                         style={{ background: `${accentColor}18` }}>
+                      {icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-gray-800 truncate">{name}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        {[subj, date].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-[12px] font-bold ${pct >= 60 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {pct}%
+                      </span>
+                      {s.status === 'complete' && (
+                        <button onClick={() => onView(s)} disabled={viewLoadingId === s._id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-60 transition-colors">
+                          {viewLoadingId === s._id
+                            ? <span className="w-3 h-3 rounded-full border-2 border-indigo-300 border-t-indigo-700 animate-spin" />
+                            : 'View Results'}
+                        </button>
+                      )}
+                      {s.status !== 'complete' && (
+                        <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-600">
+                          In Progress
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Practice result modal ─────────────────────────────────────
+function PracticeResultModal({ result, onClose }) {
+  const { session, config } = result;
+  if (!session) {
+    return (
+      <div className="fixed inset-0 z-[1200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-8 text-center max-w-sm w-full">
+          <p className="text-4xl mb-3">📊</p>
+          <h3 className="text-base font-extrabold text-gray-800 mb-2">Results Unavailable</h3>
+          <p className="text-sm text-gray-500 mb-5">Could not load the score report.</p>
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold">Close</button>
+        </div>
+      </div>
+    );
+  }
+  const pct       = session.percentage || 0;
+  const passed    = pct >= 60;
+  const breakdown = session.breakdown || [];
+  const correct   = breakdown.filter(b => b.is_correct).length;
+  return (
+    <div className="fixed inset-0 z-[1200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
+           style={{ boxShadow: '0 25px 80px rgba(0,0,0,0.35)' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 shrink-0"
+             style={{ background: 'linear-gradient(135deg,#0d9488,#0891b2)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                 style={{ background: 'rgba(255,255,255,0.2)' }}>📚</div>
+            <div>
+              <h3 className="text-sm font-extrabold text-white">Practice Report</h3>
+              <p className="text-xs text-teal-200 mt-0.5">{config?.name || 'Practice Test'}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 text-white">
+              <span className="text-sm font-extrabold">{correct}/{breakdown.length}</span>
+              <span className="text-[11px] opacity-70">({pct}%)</span>
+              <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${passed ? 'bg-emerald-400 text-white' : 'bg-red-400 text-white'}`}>
+                {passed ? 'PASSED' : 'NEEDS WORK'}
+              </span>
+            </div>
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-white/15 text-white hover:bg-white/30 flex items-center justify-center text-sm font-bold transition-colors">
+              ✕
+            </button>
+          </div>
+        </div>
+        {/* Config meta */}
+        {config && (
+          <div className="flex items-center gap-4 px-5 py-2.5 shrink-0 bg-teal-50 border-b border-teal-100 text-xs text-teal-700 flex-wrap">
+            {config.topic     && <span>Topic: <strong>{config.topic}</strong></span>}
+            {config.sub_topic && <span>Subtopic: <strong>{config.sub_topic}</strong></span>}
+            {config.subject   && <span>Subject: <strong>{SUBJ_LABEL[config.subject] || config.subject}</strong></span>}
+          </div>
+        )}
+        {/* Questions */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+          {!breakdown.length ? (
+            <div className="py-12 text-center text-gray-400 text-sm">No question data available</div>
+          ) : (
+            breakdown.map((q, i) => {
+              const isCorrect   = q.is_correct;
+              const notAnswered = !q.selected;
+              return (
+                <div key={q.question_id || i}
+                  className={`rounded-2xl border overflow-hidden ${notAnswered ? 'border-gray-200' : isCorrect ? 'border-emerald-200' : 'border-red-200'}`}>
+                  <div className="flex items-center gap-3 px-4 py-3"
+                       style={{ background: notAnswered ? '#f9fafb' : isCorrect ? '#f0fdf4' : '#fff1f2' }}>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-extrabold text-white shrink-0"
+                         style={{ background: notAnswered ? '#9ca3af' : isCorrect ? '#10b981' : '#ef4444' }}>
+                      {i + 1}
+                    </div>
+                    <p className="text-[13px] font-semibold flex-1 min-w-0 truncate"
+                       style={{ color: notAnswered ? '#6b7280' : isCorrect ? '#065f46' : '#991b1b' }}>
+                      {sanitizeText(q.stem) || `Question ${i + 1}`}
+                    </p>
+                    <div className="shrink-0">
+                      {notAnswered ? (
+                        <span className="text-[11px] font-bold text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">Not attempted</span>
+                      ) : isCorrect ? (
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">✓ Correct · +1 pt</span>
+                      ) : (
+                        <span className="text-[11px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">✗ Wrong · 0 pts</span>
+                      )}
+                    </div>
+                  </div>
+                  {(q.option_a || q.option_b) && (
+                    <div className="px-4 py-4 bg-white space-y-1.5">
+                      {['A','B','C','D'].map(letter => {
+                        const choiceText      = q['option_' + letter.toLowerCase()];
+                        if (!choiceText) return null;
+                        const isStudentAnswer = q.selected === letter;
+                        const isAnswerKey     = q.correct_answer === letter;
+                        let bg = '#f9fafb', border = '#e5e7eb', color = '#374151';
+                        if      (isStudentAnswer && isAnswerKey)  { bg = '#f0fdf4'; border = '#6ee7b7'; color = '#065f46'; }
+                        else if (isStudentAnswer && !isAnswerKey) { bg = '#fff1f2'; border = '#fca5a5'; color = '#991b1b'; }
+                        else if (!isStudentAnswer && isAnswerKey) { bg = '#f0fdf4'; border = '#a7f3d0'; color = '#065f46'; }
+                        return (
+                          <div key={letter} className="flex items-center gap-2.5 px-3 py-2 rounded-xl border"
+                               style={{ background: bg, borderColor: border }}>
+                            <div className="w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-extrabold shrink-0"
+                                 style={{ background: border, color }}>{letter}</div>
+                            <span className="text-[13px] flex-1" style={{ color }}>{sanitizeText(choiceText)}</span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {isStudentAnswer && <span className="text-[10px] font-bold" style={{ color }}>Your answer</span>}
+                              {isAnswerKey      && <span className="text-[10px] font-extrabold text-emerald-600">✓ Key</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {q.explanation && (
+                    <div className="px-4 pb-4 bg-white">
+                      <div className="flex gap-2.5 p-3.5 bg-amber-50 rounded-xl border border-amber-200">
+                        <span className="text-base shrink-0">💡</span>
+                        <div>
+                          <p className="text-[11px] font-extrabold text-amber-700 uppercase tracking-wide mb-1">Explanation</p>
+                          <p className="text-[12px] text-amber-800 leading-relaxed">{sanitizeText(q.explanation)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Loading overlay ───────────────────────────────────────────
 function LoadingOverlay() {
   return (
@@ -671,10 +884,14 @@ export default function StudentProfile() {
   const [activeTab, setActiveTab]   = useState('Overview');
   const [newNote, setNewNote]       = useState('');
   const [notes, setNotes]           = useState([]);
-  const [satAssignments, setSatAssignments] = useState([]);
+  const [adaptiveSessions,  setAdaptiveSessions]  = useState([]);
+  const [practiceSessions,  setPracticeSessions]  = useState([]);
+  const [satSessionsLoading, setSatSessionsLoading] = useState(true);
 
-  const [satResult, setSatResult]             = useState(null);
-  const [satResultLoading, setSatResultLoading] = useState(null);
+  const [adaptiveResult, setAdaptiveResult]         = useState(null);
+  const [adaptiveResultLoading, setAdaptiveResultLoading] = useState(null);
+  const [practiceResult, setPracticeResult]         = useState(null);
+  const [practiceResultLoading, setPracticeResultLoading] = useState(null);
 
   useEffect(() => {
     studentService.getById(id)
@@ -682,21 +899,40 @@ export default function StudentProfile() {
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
 
-    satMentorService.getAssignments({ student_id: id })
-      .then(res => setSatAssignments(res.data || []))
-      .catch(() => setSatAssignments([]));
+    setSatSessionsLoading(true);
+    Promise.all([
+      satMentorService.getStudentSessions(id).catch(() => ({ data: [] })),
+      satMentorService.getStudentPracticeSessions(id).catch(() => ({ data: [] })),
+    ]).then(([adaptiveRes, practiceRes]) => {
+      setAdaptiveSessions(adaptiveRes.data || []);
+      setPracticeSessions(practiceRes.data || []);
+      setSatSessionsLoading(false);
+    });
   }, [id]);
 
-  const handleViewSatResult = async (a) => {
-    if (satResultLoading) return;
-    setSatResultLoading(a._id);
+  const handleViewAdaptiveResult = async (session) => {
+    if (adaptiveResultLoading) return;
+    setAdaptiveResultLoading(session._id);
     try {
-      const res = await satMentorService.getResults(a._id);
-      setSatResult({ session: res.data?.session ?? null, assignment: a });
+      const res = await satMentorService.getSessionResults(session._id);
+      setAdaptiveResult({ session: res.data, assignment: { exam_config_id: session.exam_config_id } });
     } catch {
-      setSatResult({ session: null, assignment: a });
+      setAdaptiveResult({ session: null, assignment: { exam_config_id: session.exam_config_id } });
     } finally {
-      setSatResultLoading(null);
+      setAdaptiveResultLoading(null);
+    }
+  };
+
+  const handleViewPracticeResult = async (session) => {
+    if (practiceResultLoading) return;
+    setPracticeResultLoading(session._id);
+    try {
+      const res = await satMentorService.getPracticeResults(session._id);
+      setPracticeResult({ session: res.data, config: session.practice_config_id });
+    } catch {
+      setPracticeResult({ session: null, config: session.practice_config_id });
+    } finally {
+      setPracticeResultLoading(null);
     }
   };
 
@@ -727,8 +963,9 @@ export default function StudentProfile() {
   const sessionsDone  = student.completedSessions || 0;
   const totalSess     = student.totalSessions || batch?.totalSessions || 0;
   const batchPct      = Math.round(((batch?.completedSessions || 0) / (batch?.totalSessions || 1)) * 100);
-  const completedSat  = satAssignments.filter(a => a.status === 'completed').length;
-  const pendingSat    = satAssignments.filter(a => a.status === 'pending').length;
+  const diagnosticSessions = adaptiveSessions.filter(s => s.exam_config_id?.type === 'diagnostic');
+  const mockSessions       = adaptiveSessions.filter(s => s.exam_config_id?.type === 'mock');
+  const totalTests         = adaptiveSessions.length + practiceSessions.length;
 
   const addNote = () => {
     if (newNote.trim()) {
@@ -780,7 +1017,7 @@ export default function StudentProfile() {
         {[
           { label: 'Sessions Done',   value: sessionsDone,  color: '#0d9488' },
           { label: 'Total Sessions',  value: totalSess,     color: '#7c3aed' },
-          { label: 'Tests Completed', value: completedSat > 0 ? `${completedSat}/${satAssignments.length}` : '—', color: '#f59e0b' },
+          { label: 'Tests Taken', value: totalTests > 0 ? totalTests : '—', color: '#f59e0b' },
           { label: 'Enrolled', value: student.enrollmentDate
               ? new Date(student.enrollmentDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
               : '—', color: '#10b981' },
@@ -841,45 +1078,6 @@ export default function StudentProfile() {
                 ))}
               </div>
             </div>
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-bold text-gray-900">
-                  SAT Tests <span className="ml-2 text-xs font-normal text-gray-400">{completedSat}/{satAssignments.length} completed</span>
-                </h4>
-                {pendingSat > 0 && <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">{pendingSat} pending</span>}
-              </div>
-              {satAssignments.length === 0 ? (
-                <p className="text-[13px] text-gray-400">No SAT tests assigned yet.</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {satAssignments.map(a => {
-                    const sm        = SAT_STATUS[a.status] || SAT_STATUS.pending;
-                    const testName  = a.exam_config_id?.name || a.full_length_exam_config_id?.name || 'SAT Practice Test';
-                    const typeLabel = a.test_type === 'full_length' ? 'Full Length' : a.exam_config_id?.subject === 'math' ? 'Math' : 'Reading & Writing';
-                    const isDue     = a.due_date && new Date(a.due_date) < new Date() && a.status !== 'completed';
-                    return (
-                      <div key={a._id} className="flex items-center justify-between py-2.5 border-b border-gray-50 gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-gray-800 truncate">{testName}</p>
-                          <div className="flex gap-1.5 mt-0.5">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">{typeLabel}</span>
-                            {isDue && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">Overdue</span>}
-                            {a.due_date && !isDue && a.status !== 'completed' && (
-                              <span className="text-[10px] text-gray-400">Due {new Date(a.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
-                            )}
-                          </div>
-                        </div>
-                        <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold shrink-0"
-                              style={{ background: sm.bg, color: sm.color }}>
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: sm.dot }} />
-                          {sm.label}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
@@ -930,61 +1128,37 @@ export default function StudentProfile() {
               ))}
             </div>
 
-            {/* SAT Tests */}
-            {satAssignments.length > 0 && (
-              <div className="border-t border-gray-100 pt-5">
-                <div className="flex justify-between mb-3">
-                  <span className="text-sm font-semibold text-gray-700">SAT Tests</span>
-                  <span className="text-sm text-gray-500">{completedSat} / {satAssignments.length} completed</span>
-                </div>
-                <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden mb-4">
-                  <div className="h-full rounded-full transition-all"
-                       style={{ width: satAssignments.length > 0 ? `${Math.round((completedSat / satAssignments.length) * 100)}%` : '0%', background: completedSat === satAssignments.length ? '#10b981' : '#4f46e5' }} />
-                </div>
-                <div className="flex flex-col gap-2">
-                  {satAssignments.map(a => {
-                    const sm        = SAT_STATUS[a.status] || SAT_STATUS.pending;
-                    const testName  = a.exam_config_id?.name || a.full_length_exam_config_id?.name || 'SAT Practice Test';
-                    const typeLabel = a.test_type === 'full_length' ? 'Full Length' : a.exam_config_id?.subject === 'math' ? 'Math' : 'Reading & Writing';
-                    const isDue     = a.due_date && new Date(a.due_date) < new Date() && a.status !== 'completed';
-                    const isFetching = satResultLoading === a._id;
-                    return (
-                      <div key={a._id} className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm shrink-0"
-                             style={{ background: 'linear-gradient(135deg,#1e1b4b,#312e81)' }}>📐</div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-gray-800 truncate">{testName}</p>
-                          <div className="flex gap-1.5 mt-0.5">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">{typeLabel}</span>
-                            {isDue && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">Overdue</span>}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold"
-                                style={{ background: sm.bg, color: sm.color }}>
-                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: sm.dot }} />
-                            {sm.label}
-                          </span>
-                          {a.status === 'completed' && (
-                            <button onClick={() => handleViewSatResult(a)} disabled={isFetching}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-60 transition-colors">
-                              {isFetching
-                                ? <span className="w-3 h-3 rounded-full border-2 border-indigo-300 border-t-indigo-700 animate-spin" />
-                                : 'View Results'}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {satAssignments.length === 0 && (
-              <div className="border-t border-gray-100 pt-5 text-center text-gray-400 text-sm py-8">
-                No SAT tests assigned to this student yet.
-              </div>
-            )}
+            {/* SAT Test History — three expandable categories */}
+            <div className="border-t border-gray-100 pt-5 flex flex-col gap-3">
+              <p className="text-sm font-semibold text-gray-700">SAT Test History</p>
+              <SatTestSection
+                label="Diagnostic Tests"
+                icon="🔍"
+                accentColor="#f97316"
+                sessions={diagnosticSessions}
+                loading={satSessionsLoading}
+                onView={handleViewAdaptiveResult}
+                viewLoadingId={adaptiveResultLoading}
+              />
+              <SatTestSection
+                label="Mock Tests"
+                icon="📋"
+                accentColor="#4f46e5"
+                sessions={mockSessions}
+                loading={satSessionsLoading}
+                onView={handleViewAdaptiveResult}
+                viewLoadingId={adaptiveResultLoading}
+              />
+              <SatTestSection
+                label="Practice Tests"
+                icon="📚"
+                accentColor="#0d9488"
+                sessions={practiceSessions}
+                loading={satSessionsLoading}
+                onView={handleViewPracticeResult}
+                viewLoadingId={practiceResultLoading}
+              />
+            </div>
           </div>
         )}
 
@@ -1025,13 +1199,20 @@ export default function StudentProfile() {
         )}
       </div>
 
-      {satResultLoading && <LoadingOverlay />}
+      {(adaptiveResultLoading || practiceResultLoading) && <LoadingOverlay />}
 
-      {satResult && (
+      {adaptiveResult && (
         <SatScoreModal
-          session={satResult.session}
-          assignment={satResult.assignment}
-          onClose={() => setSatResult(null)}
+          session={adaptiveResult.session}
+          assignment={adaptiveResult.assignment}
+          onClose={() => setAdaptiveResult(null)}
+        />
+      )}
+
+      {practiceResult && (
+        <PracticeResultModal
+          result={practiceResult}
+          onClose={() => setPracticeResult(null)}
         />
       )}
     </div>
