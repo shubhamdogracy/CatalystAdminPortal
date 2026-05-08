@@ -36,7 +36,10 @@ export default function StudentsPage() {
   useEffect(() => {
     if (!user?._id) return;
     studentService.getByMentor(user._id)
-      .then(res => setStudents((res.data || []).map(({ student, batch }) => ({ ...student, batch }))))
+      .then(res => {
+        const list = (res.data || []).map(({ student, batch }) => ({ ...student, batch }));
+        setStudents(list);
+      })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
   }, [user?._id]);
@@ -140,8 +143,8 @@ export default function StudentsPage() {
           </div>
         ) : (
           filtered.map(student => {
-            const isActive = student.isActive !== false;
-            const prog     = student.progress || 0;
+            const isActive  = student.isActive !== false;
+            const prog      = student.progress || 0;
             return (
               <div key={student._id} className="flex items-center px-5 py-3.5 border-b border-gray-100 gap-3 hover:bg-gray-50 transition-colors">
                 <div className="flex-[2] flex items-center gap-2.5">

@@ -105,7 +105,7 @@ export const satAdminService = {
   getStats:         ()             => req('/sat/admin/question-bank/stats'),
   updateQuestion:   (id, payload)  => req(`/sat/admin/question-bank/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteQuestion:   (id)           => req(`/sat/admin/question-bank/${id}`, { method: 'DELETE' }),
-  // Subject exam configs
+  // Subject exam configs (mock + diagnostic)
   getExamConfigs:   (params = {})  => { const qs = new URLSearchParams(params).toString(); return req(`/sat/admin/exam-configs${qs ? `?${qs}` : ''}`); },
   getExamConfigById:(id)           => req(`/sat/admin/exam-configs/${id}`),
   createExamConfig: (payload)      => req('/sat/admin/exam-configs', { method: 'POST', body: JSON.stringify(payload) }),
@@ -114,6 +114,10 @@ export const satAdminService = {
   getFullLengthConfigs:   ()              => req('/sat/admin/full-length-configs'),
   createFullLengthConfig: (payload)       => req('/sat/admin/full-length-configs', { method: 'POST', body: JSON.stringify(payload) }),
   updateFullLengthConfig: (id, payload)   => req(`/sat/admin/full-length-configs/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  // Practice test configs
+  getPracticeConfigs:   (params = {})  => { const qs = new URLSearchParams(params).toString(); return req(`/sat/admin/practice-configs${qs ? `?${qs}` : ''}`); },
+  createPracticeConfig: (payload)      => req('/sat/admin/practice-configs', { method: 'POST', body: JSON.stringify(payload) }),
+  updatePracticeConfig: (id, payload)  => req(`/sat/admin/practice-configs/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
 };
 
 export const satStudentService = {
@@ -128,8 +132,8 @@ export const satStudentService = {
 export const satMentorService = {
   listTests:      ()              => req('/sat/mentor/exam-configs'),
   assign:         (payload)       => req('/sat/mentor/assign', { method: 'POST', body: JSON.stringify(payload) }),
-  assignBatch:    (payload)       => req('/sat/mentor/assign/batch', { method: 'POST', body: JSON.stringify(payload) }),
   getAssignments: (params = {})   => { const qs = new URLSearchParams(params).toString(); return req(`/sat/mentor/assignments${qs ? `?${qs}` : ''}`); },
+  // Used by mentor to view a student's completed SAT results
   getResults:     (id)            => req(`/sat/mentor/assignments/${id}/results`),
 };
 

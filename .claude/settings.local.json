@@ -4,7 +4,15 @@
       "Bash(npm install:*)",
       "Bash(npm run:*)",
       "Bash(grep -rn \"page: { padding: 24, height: '100%', overflowY: 'auto'\" --include=\"*.jsx\" -l)",
-      "Bash(npx tailwindcss:*)"
+      "Bash(npx tailwindcss:*)",
+      "Bash(Get-ChildItem -Path \"C:\\\\users\\\\shubham\\\\webstormprojects\\\\catalyst_admin\\\\src\" -Directory -Recurse)",
+      "Bash(Select-Object -First 30)",
+      "Bash(Get-ChildItem *)",
+      "Bash(node *)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(xargs grep -l \"satMentorService\\\\|satStudentService\")",
+      "Bash(npx vite *)",
+      "Bash(xargs grep -l -i \"examconfig\\\\|exam-config\\\\|ExamConfig\")"
     ]
   }
 }
