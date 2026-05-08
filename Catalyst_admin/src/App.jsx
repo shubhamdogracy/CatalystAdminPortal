@@ -19,7 +19,6 @@ import StudentProfile     from './components/mentor/students/StudentProfile';
 import SlotsPage          from './components/mentor/slots/SlotsPage';
 import SessionsPage       from './components/mentor/sessions/SessionsPage';
 import AnalyticsPage      from './components/mentor/analytics/AnalyticsPage';
-import AssignmentsPage    from './components/mentor/assignments/AssignmentsPage';
 import CommunicationPage  from './components/mentor/communication/CommunicationPage';
 import NotificationsPage  from './components/mentor/notifications/NotificationsPage';
 import ProfilePage        from './components/common/ProfilePage';
@@ -35,17 +34,9 @@ import AddStudentPage     from './components/operations/students/AddStudentPage'
 import BatchesPage            from './components/operations/batches/BatchesPage';
 import BatchDetailPage        from './components/operations/batches/BatchDetailPage';
 import OpsNotificationsPage    from './components/operations/notifications/OpsNotificationsPage';
-import DiagnosticTestsPage    from './components/operations/sat/DiagnosticTestsPage';
-import PracticeTestsPage      from './components/operations/sat/PracticeTestsPage';
-import MockTestsPage          from './components/operations/sat/MockTestsPage';
 import SatQuestionBankPage    from './components/operations/sat/SatQuestionBankPage';
+import SatExamConfigsPage     from './components/operations/sat/SatExamConfigsPage';
 
-
-// ── Student routes ──────────────────────────────────────────
-import StudentLayout          from './components/student/StudentLayout';
-import StudentDashboard       from './components/student/dashboard/StudentDashboard';
-import StudentAssignmentsPage from './components/student/assignments/StudentAssignmentsPage';
-import SatTestPage            from './components/student/sat/SatTestPage';
 
 export default function App() {
   return (
@@ -72,7 +63,6 @@ export default function App() {
             <Route path="slots"         element={<SlotsPage />} />
             <Route path="sessions"      element={<SessionsPage />} />
             <Route path="analytics"     element={<AnalyticsPage />} />
-            <Route path="assignments"   element={<AssignmentsPage />} />
             <Route path="communication" element={<CommunicationPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="profile"       element={<ProfilePage />} />
@@ -96,38 +86,18 @@ export default function App() {
             <Route path="students/add"  element={<AddStudentPage />} />
             <Route path="batches"       element={<BatchesPage />} />
             <Route path="batches/:id"   element={<BatchDetailPage />} />
-            <Route path="sat-tests/diagnostic"     element={<DiagnosticTestsPage />} />
-            <Route path="sat-tests/practice"       element={<PracticeTestsPage />} />
-            <Route path="sat-tests/mock"           element={<MockTestsPage />} />
-            <Route path="sat/question-bank"        element={<SatQuestionBankPage />} />
-            <Route path="profile"                  element={<ProfilePage />} />
-            <Route path="notifications"            element={<OpsNotificationsPage />} />
+            <Route path="sat/question-bank"      element={<SatQuestionBankPage />} />
+            <Route path="sat/exam-configs"        element={<SatExamConfigsPage />} />
+            <Route path="profile"                element={<ProfilePage />} />
+            <Route path="notifications"  element={<OpsNotificationsPage />} />
+            <Route path="reports" element={
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400 p-10">
+                <p className="text-5xl">📊</p>
+                <p className="text-lg font-bold text-gray-700">Reports coming soon</p>
+                <p className="text-sm">Advanced reporting and export features are in development.</p>
+              </div>
+            } />
           </Route>
-
-          {/* ── Student routes (role guard) ── */}
-          <Route
-            path="/student"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <StudentLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard"   element={<StudentDashboard />} />
-            <Route path="assignments" element={<StudentAssignmentsPage />} />
-            <Route path="profile"     element={<ProfilePage />} />
-          </Route>
-
-          {/* ── SAT test-taking (full screen, no sidebar) ── */}
-          <Route
-            path="/student/sat-test/:assignmentId"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <SatTestPage />
-              </ProtectedRoute>
-            }
-          />
 
           {/* ── Catch-all ── */}
           <Route path="*" element={<Navigate to="/" replace />} />
