@@ -19,7 +19,6 @@ import StudentProfile     from './components/mentor/students/StudentProfile';
 import SlotsPage          from './components/mentor/slots/SlotsPage';
 import SessionsPage       from './components/mentor/sessions/SessionsPage';
 import AnalyticsPage      from './components/mentor/analytics/AnalyticsPage';
-import AssignmentsPage    from './components/mentor/assignments/AssignmentsPage';
 import CommunicationPage  from './components/mentor/communication/CommunicationPage';
 import NotificationsPage  from './components/mentor/notifications/NotificationsPage';
 import ProfilePage        from './components/common/ProfilePage';
@@ -35,15 +34,9 @@ import AddStudentPage     from './components/operations/students/AddStudentPage'
 import BatchesPage            from './components/operations/batches/BatchesPage';
 import BatchDetailPage        from './components/operations/batches/BatchDetailPage';
 import OpsNotificationsPage    from './components/operations/notifications/OpsNotificationsPage';
-import OpsExploreTestsPage    from './components/operations/explore-tests/OpsExploreTestsPage';
 import SatQuestionBankPage    from './components/operations/sat/SatQuestionBankPage';
 import SatExamConfigsPage     from './components/operations/sat/SatExamConfigsPage';
 
-// ── Student routes ──────────────────────────────────────────
-import StudentLayout          from './components/student/StudentLayout';
-import StudentDashboard       from './components/student/dashboard/StudentDashboard';
-import StudentAssignmentsPage from './components/student/assignments/StudentAssignmentsPage';
-import SatTestPage            from './components/student/sat/SatTestPage';
 
 export default function App() {
   return (
@@ -70,7 +63,6 @@ export default function App() {
             <Route path="slots"         element={<SlotsPage />} />
             <Route path="sessions"      element={<SessionsPage />} />
             <Route path="analytics"     element={<AnalyticsPage />} />
-            <Route path="assignments"   element={<AssignmentsPage />} />
             <Route path="communication" element={<CommunicationPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="profile"       element={<ProfilePage />} />
@@ -94,7 +86,6 @@ export default function App() {
             <Route path="students/add"  element={<AddStudentPage />} />
             <Route path="batches"       element={<BatchesPage />} />
             <Route path="batches/:id"   element={<BatchDetailPage />} />
-            <Route path="explore-tests"          element={<OpsExploreTestsPage />} />
             <Route path="sat/question-bank"      element={<SatQuestionBankPage />} />
             <Route path="sat/exam-configs"        element={<SatExamConfigsPage />} />
             <Route path="profile"                element={<ProfilePage />} />
@@ -107,31 +98,6 @@ export default function App() {
               </div>
             } />
           </Route>
-
-          {/* ── Student routes (role guard) ── */}
-          <Route
-            path="/student"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <StudentLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard"   element={<StudentDashboard />} />
-            <Route path="assignments" element={<StudentAssignmentsPage />} />
-            <Route path="profile"     element={<ProfilePage />} />
-          </Route>
-
-          {/* ── SAT test-taking (full screen, no sidebar) ── */}
-          <Route
-            path="/student/sat-test/:assignmentId"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <SatTestPage />
-              </ProtectedRoute>
-            }
-          />
 
           {/* ── Catch-all ── */}
           <Route path="*" element={<Navigate to="/" replace />} />
