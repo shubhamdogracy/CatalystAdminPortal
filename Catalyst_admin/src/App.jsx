@@ -35,9 +35,11 @@ import AddStudentPage     from './components/operations/students/AddStudentPage'
 import BatchesPage            from './components/operations/batches/BatchesPage';
 import BatchDetailPage        from './components/operations/batches/BatchDetailPage';
 import OpsNotificationsPage    from './components/operations/notifications/OpsNotificationsPage';
-import OpsExploreTestsPage    from './components/operations/explore-tests/OpsExploreTestsPage';
+import DiagnosticTestsPage    from './components/operations/sat/DiagnosticTestsPage';
+import PracticeTestsPage      from './components/operations/sat/PracticeTestsPage';
+import MockTestsPage          from './components/operations/sat/MockTestsPage';
 import SatQuestionBankPage    from './components/operations/sat/SatQuestionBankPage';
-import SatExamConfigsPage     from './components/operations/sat/SatExamConfigsPage';
+
 
 // ── Student routes ──────────────────────────────────────────
 import StudentLayout          from './components/student/StudentLayout';
@@ -94,18 +96,12 @@ export default function App() {
             <Route path="students/add"  element={<AddStudentPage />} />
             <Route path="batches"       element={<BatchesPage />} />
             <Route path="batches/:id"   element={<BatchDetailPage />} />
-            <Route path="explore-tests"          element={<OpsExploreTestsPage />} />
-            <Route path="sat/question-bank"      element={<SatQuestionBankPage />} />
-            <Route path="sat/exam-configs"        element={<SatExamConfigsPage />} />
-            <Route path="profile"                element={<ProfilePage />} />
-            <Route path="notifications"  element={<OpsNotificationsPage />} />
-            <Route path="reports" element={
-              <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400 p-10">
-                <p className="text-5xl">📊</p>
-                <p className="text-lg font-bold text-gray-700">Reports coming soon</p>
-                <p className="text-sm">Advanced reporting and export features are in development.</p>
-              </div>
-            } />
+            <Route path="sat-tests/diagnostic"     element={<DiagnosticTestsPage />} />
+            <Route path="sat-tests/practice"       element={<PracticeTestsPage />} />
+            <Route path="sat-tests/mock"           element={<MockTestsPage />} />
+            <Route path="sat/question-bank"        element={<SatQuestionBankPage />} />
+            <Route path="profile"                  element={<ProfilePage />} />
+            <Route path="notifications"            element={<OpsNotificationsPage />} />
           </Route>
 
           {/* ── Student routes (role guard) ── */}

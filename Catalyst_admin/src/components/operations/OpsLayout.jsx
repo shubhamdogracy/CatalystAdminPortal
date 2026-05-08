@@ -11,14 +11,16 @@ import OpsSidebar from './OpsSidebar';
 import BAvatar from 'boring-avatars';
 
 const PAGE_TITLES = {
-  '/operations/dashboard':     'Platform Overview',
-  '/operations/mentors':       'Mentors',
-  '/operations/students':      'Students',
-  '/operations/batches':       'Batch Management',
-  '/operations/reports':       'Reports',
-  '/operations/notifications': 'Notifications',
-  '/operations/profile':       'My Profile',
-  '/operations/communication': 'Communication',
+  '/operations/dashboard':            'Platform Overview',
+  '/operations/mentors':              'Mentors',
+  '/operations/students':             'Students',
+  '/operations/batches':              'Batch Management',
+  '/operations/sat-tests/diagnostic': 'Diagnostic Tests',
+  '/operations/sat-tests/practice':   'Practice Tests',
+  '/operations/sat-tests/mock':       'Mock Tests',
+  '/operations/sat/question-bank':    'Question Bank',
+  '/operations/notifications':        'Notifications',
+  '/operations/profile':              'My Profile',
 };
 
 const notifTypeConfig = {
