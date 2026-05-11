@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { studentService, satMentorService } from '../../../services/api';
+import MathContent from '../../common/MathContent';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -113,6 +114,25 @@ function generateSatAISummary(topicMastery, totalPct) {
     : `Review every wrong answer carefully, especially the explanations. Schedule focused practice on the lowest-scoring topics.`;
 
   return { overallMsg, strengthMsg, improveMsg, devMsg, nextMsg, strong, needsPractice, developing, allTopics, totalPct, passed };
+}
+
+function computePracticeTopicMastery(session, config) {
+  const groups = {};
+  const groupName = config?.topic || (config?.subject === 'math' ? 'Math' : 'Reading & Writing') || 'Practice';
+
+  (session.breakdown || []).forEach(q => {
+    const topic = (q.sub_topic || q.topic || '').trim() || 'General';
+    if (!groups[groupName]) groups[groupName] = {};
+    if (!groups[groupName][topic]) groups[groupName][topic] = { correct: 0, total: 0, score: 0, maxScore: 0 };
+    groups[groupName][topic].total++;
+    groups[groupName][topic].maxScore += (q.points || 1);
+    if (q.is_correct) {
+      groups[groupName][topic].correct++;
+      groups[groupName][topic].score += (q.points || 1);
+    }
+  });
+
+  return groups;
 }
 
 // ── Chart tooltip ─────────────────────────────────────────────
@@ -520,10 +540,11 @@ function SatScoreModal({ session, assignment, onClose }) {
                         {i + 1}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold truncate"
-                           style={{ color: notAnswered ? '#6b7280' : isCorrect ? '#065f46' : '#991b1b' }}>
-                          {sanitizeText(q.stem) || `Question ${i + 1}`}
-                        </p>
+                        <MathContent
+                          html={sanitizeText(q.stem) || `Question ${i + 1}`}
+                          className="text-[13px] font-semibold [&_p]:m-0 [&_.katex]:text-[13px]"
+                          style={{ color: notAnswered ? '#6b7280' : isCorrect ? '#065f46' : '#991b1b' }}
+                        />
                         <div className="flex flex-wrap gap-1 mt-0.5">
                           {q.topic && <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-2 py-0.5">{sanitizeText(q.topic)}</span>}
                           {q.sub_topic && <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">{sanitizeText(q.sub_topic)}</span>}
@@ -560,7 +581,7 @@ function SatScoreModal({ session, assignment, onClose }) {
                                  style={{ background: bg, borderColor: border }}>
                               <div className="w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-extrabold shrink-0"
                                    style={{ background: border, color }}>{letter}</div>
-                              <span className="text-[13px] flex-1" style={{ color }}>{sanitizeText(choiceText)}</span>
+                              <MathContent html={sanitizeText(choiceText)} className="text-[13px] flex-1 [&_p]:m-0 [&_.katex]:text-[13px]" style={{ color }} />
                               <div className="flex items-center gap-1 shrink-0">
                                 {isStudentAnswer && <span className="text-[10px] font-bold" style={{ color }}>Your answer</span>}
                                 {isAnswerKey      && <span className="text-[10px] font-extrabold text-emerald-600">✓ Key</span>}
@@ -576,7 +597,7 @@ function SatScoreModal({ session, assignment, onClose }) {
                           <span className="text-base shrink-0">💡</span>
                           <div>
                             <p className="text-[11px] font-extrabold text-amber-700 uppercase tracking-wide mb-1">Explanation</p>
-                            <p className="text-[12px] text-amber-800 leading-relaxed">{sanitizeText(q.explanation)}</p>
+                            <MathContent html={sanitizeText(q.explanation)} className="text-[12px] text-amber-800 leading-relaxed [&_p]:m-0" />
                           </div>
                         </div>
                       </div>
@@ -647,9 +668,70 @@ function SatScoreModal({ session, assignment, onClose }) {
 }
 
 // ── Collapsible SAT test section (diagnostic / mock / practice) ──
+// Groups sessions that share a series name (e.g., "Diagnostic-Test-1 — Math" +
+// "Diagnostic-Test-1 — Reading & Writing") into one combined card.
+const SERIES_RE = / — (Math|Reading & Writing)$/;
+
 function SatTestSection({ label, icon, accentColor, sessions, loading, onView, viewLoadingId }) {
   const [expanded, setExpanded] = useState(false);
-  const completed = sessions.filter(s => s.status === 'complete').length;
+  const completed = sessions.filter(s => s.status === 'complete' || s.status === 'completed').length;
+
+  // Build display rows: full_length entries pass through; standalone series sessions are grouped
+  const displayRows = useMemo(() => {
+    const fullLengthRows = sessions
+      .filter(s => s.session_type === 'full_length')
+      .map(s => ({ type: 'full_length', session: s, latestAt: +new Date(s.createdAt || 0) }));
+
+    const seriesMap = {};
+    const singles   = [];
+
+    sessions.filter(s => s.session_type !== 'full_length').forEach(s => {
+      const name  = s.exam_config_id?.name || '';
+      const match = name.match(SERIES_RE);
+      if (match) {
+        const series = name.replace(SERIES_RE, '').trim();
+        if (!seriesMap[series]) seriesMap[series] = { math: [], rw: [] };
+        const subj = s.exam_config_id?.subject || s.subject;
+        if (subj === 'math') seriesMap[series].math.push(s);
+        else                 seriesMap[series].rw.push(s);
+      } else {
+        singles.push({ type: 'single', session: s, latestAt: +new Date(s.createdAt || 0) });
+      }
+    });
+
+    const seriesRows = Object.entries(seriesMap).map(([series, { math, rw }]) => {
+      const all = [...math, ...rw];
+      return {
+        type: 'series', series, math, rw,
+        latestAt: Math.max(...all.map(s => +new Date(s.createdAt || 0))),
+      };
+    });
+
+    return [...fullLengthRows, ...seriesRows, ...singles]
+      .sort((a, b) => b.latestAt - a.latestAt);
+  }, [sessions]);
+
+  const fmtDate = raw => raw
+    ? new Date(raw).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '';
+
+  const ViewBtn = ({ s }) => {
+    const isDone = s.status === 'complete' || s.status === 'completed';
+    if (!isDone) return (
+      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
+        {s.status === 'pending' ? 'Pending' : 'In Progress'}
+      </span>
+    );
+    return (
+      <button onClick={() => onView(s)} disabled={viewLoadingId === s._id}
+        className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg disabled:opacity-60 transition-colors">
+        {viewLoadingId === s._id
+          ? <span className="w-3 h-3 rounded-full border-2 border-indigo-300 border-t-indigo-700 animate-spin inline-block" />
+          : 'View'}
+      </button>
+    );
+  };
+
   return (
     <div className="rounded-xl border border-gray-200 overflow-hidden">
       <button
@@ -669,6 +751,7 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, v
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
+
       {expanded && (
         <div className="border-t border-gray-100">
           {loading ? (
@@ -676,46 +759,86 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, v
               <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin" />
               Loading…
             </div>
-          ) : sessions.length === 0 ? (
+          ) : displayRows.length === 0 ? (
             <div className="py-8 text-center text-sm text-gray-400">No {label.toLowerCase()} taken yet.</div>
           ) : (
             <div className="divide-y divide-gray-50">
-              {sessions.map(s => {
-                const pct  = s.percentage ?? s.total_percentage ?? 0;
-                const name = s.exam_config_id?.name || s.practice_config_id?.name || 'Test';
-                const subj = SUBJ_LABEL[s.exam_config_id?.subject || s.practice_config_id?.subject] || '';
-                const date = s.created_at
-                  ? new Date(s.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                  : '';
+              {displayRows.map(row => {
+                /* ── Full-length or single-subject session ── */
+                if (row.type === 'full_length' || row.type === 'single') {
+                  const s    = row.session;
+                  const pct  = s.percentage ?? s.total_percentage ?? null;
+                  const name = s.full_length_exam_config_id?.name || s.exam_config_id?.name || 'Test';
+                  const subj = SUBJ_LABEL[s.exam_config_id?.subject] || '';
+                  const date = fmtDate(s.createdAt);
+                  const isDone = s.status === 'complete' || s.status === 'completed';
+                  return (
+                    <div key={s._id} className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base" style={{ background: `${accentColor}18` }}>{icon}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-gray-800 truncate">{name}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{[subj, date].filter(Boolean).join(' · ')}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {pct !== null && <span className={`text-[12px] font-bold ${pct >= 60 ? 'text-emerald-600' : 'text-red-500'}`}>{pct}%</span>}
+                        {isDone ? (
+                          <button onClick={() => onView(s)} disabled={viewLoadingId === s._id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-60 transition-colors">
+                            {viewLoadingId === s._id ? <span className="w-3 h-3 rounded-full border-2 border-indigo-300 border-t-indigo-700 animate-spin" /> : 'View Results'}
+                          </button>
+                        ) : (
+                          <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${s.status === 'pending' ? 'bg-gray-100 text-gray-500' : 'bg-amber-50 text-amber-600'}`}>
+                            {s.status === 'pending' ? 'Pending' : 'In Progress'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                /* ── Series group (e.g., "Diagnostic-Test-1 — Math" + "— R&W") ── */
+                const { series, math, rw } = row;
+                const latestMath = [...math].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0];
+                const latestRw   = [...rw].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0];
+                const mathPct    = latestMath ? (latestMath.total_percentage ?? null) : null;
+                const rwPct      = latestRw   ? (latestRw.total_percentage   ?? null) : null;
+                const date       = fmtDate(latestMath?.createdAt || latestRw?.createdAt);
+
                 return (
-                  <div key={s._id} className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base"
-                         style={{ background: `${accentColor}18` }}>
-                      {icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-gray-800 truncate">{name}</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5">
-                        {[subj, date].filter(Boolean).join(' · ')}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-[12px] font-bold ${pct >= 60 ? 'text-emerald-600' : 'text-red-500'}`}>
-                        {pct}%
-                      </span>
-                      {s.status === 'complete' && (
-                        <button onClick={() => onView(s)} disabled={viewLoadingId === s._id}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-60 transition-colors">
-                          {viewLoadingId === s._id
-                            ? <span className="w-3 h-3 rounded-full border-2 border-indigo-300 border-t-indigo-700 animate-spin" />
-                            : 'View Results'}
-                        </button>
-                      )}
-                      {s.status !== 'complete' && (
-                        <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-600">
-                          In Progress
-                        </span>
-                      )}
+                  <div key={series} className="px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base mt-0.5" style={{ background: `${accentColor}18` }}>{icon}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <p className="text-[13px] font-semibold text-gray-800">{series}</p>
+                          {date && <span className="text-[11px] text-gray-400 shrink-0">{date}</span>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* Math panel */}
+                          <div className="rounded-lg px-2.5 py-2" style={{ background: '#f5f3ff', border: '1px solid #e9d5ff' }}>
+                            <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1.5">Math</p>
+                            {latestMath ? (
+                              <div className="flex items-center justify-between gap-1">
+                                {mathPct !== null && <span className={`text-[13px] font-bold ${mathPct >= 60 ? 'text-emerald-600' : 'text-red-500'}`}>{mathPct}%</span>}
+                                <ViewBtn s={latestMath} />
+                              </div>
+                            ) : <span className="text-[11px] text-gray-400">Not taken</span>}
+                          </div>
+                          {/* R&W panel */}
+                          <div className="rounded-lg px-2.5 py-2" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+                            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1.5">Reading &amp; Writing</p>
+                            {latestRw ? (
+                              <div className="flex items-center justify-between gap-1">
+                                {rwPct !== null && <span className={`text-[13px] font-bold ${rwPct >= 60 ? 'text-emerald-600' : 'text-red-500'}`}>{rwPct}%</span>}
+                                <ViewBtn s={latestRw} />
+                              </div>
+                            ) : <span className="text-[11px] text-gray-400">Not taken</span>}
+                          </div>
+                        </div>
+                        {(math.length + rw.length) > 2 && (
+                          <p className="text-[10px] text-gray-400 mt-1.5">{math.length + rw.length} total sessions</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -728,9 +851,24 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, v
   );
 }
 
-// ── Practice result modal ─────────────────────────────────────
+// ── Practice result modal — Questions + AI Summary ───────────
 function PracticeResultModal({ result, onClose }) {
   const { session, config } = result;
+  const [activeTab, setActiveTab] = useState('questions');
+
+  const topicMastery = useMemo(
+    () => session ? computePracticeTopicMastery(session, config) : {},
+    [session, config],
+  );
+  const hasTopics = Object.keys(topicMastery).length > 0 &&
+    Object.values(topicMastery).some(g => Object.keys(g).length > 0);
+
+  const pct    = session?.percentage || 0;
+  const aiData = useMemo(
+    () => hasTopics ? generateSatAISummary(topicMastery, pct) : null,
+    [topicMastery, pct, hasTopics],
+  );
+
   if (!session) {
     return (
       <div className="fixed inset-0 z-[1200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -743,14 +881,16 @@ function PracticeResultModal({ result, onClose }) {
       </div>
     );
   }
-  const pct       = session.percentage || 0;
-  const passed    = pct >= 60;
+
   const breakdown = session.breakdown || [];
   const correct   = breakdown.filter(b => b.is_correct).length;
+  const passed    = pct >= 60;
+
   return (
     <div className="fixed inset-0 z-[1200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
            style={{ boxShadow: '0 25px 80px rgba(0,0,0,0.35)' }}>
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 shrink-0"
              style={{ background: 'linear-gradient(135deg,#0d9488,#0891b2)' }}>
@@ -776,87 +916,601 @@ function PracticeResultModal({ result, onClose }) {
             </button>
           </div>
         </div>
-        {/* Config meta */}
+
+        {/* Tab bar — Questions | AI Summary */}
+        <div className="shrink-0 border-b border-gray-100 bg-white px-5 pt-3 flex gap-1">
+          {[{ key: 'questions', label: 'Questions' }, { key: 'summary', label: 'AI Summary' }].map(t => (
+            <button key={t.key} onClick={() => setActiveTab(t.key)}
+              className="px-4 py-1.5 rounded-t-lg text-[12px] font-bold border-b-2 transition-all"
+              style={activeTab === t.key
+                ? { borderColor: '#0d9488', color: '#0d9488', background: '#fff' }
+                : { borderColor: 'transparent', color: '#9ca3af' }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Config meta bar */}
         {config && (
-          <div className="flex items-center gap-4 px-5 py-2.5 shrink-0 bg-teal-50 border-b border-teal-100 text-xs text-teal-700 flex-wrap">
+          <div className="flex items-center gap-4 px-5 py-2 shrink-0 bg-teal-50 border-b border-teal-100 text-xs text-teal-700 flex-wrap">
             {config.topic     && <span>Topic: <strong>{config.topic}</strong></span>}
-            {config.sub_topic && <span>Subtopic: <strong>{config.sub_topic}</strong></span>}
+            {config.sub_topic && <span>Sub-topic: <strong>{config.sub_topic}</strong></span>}
             {config.subject   && <span>Subject: <strong>{SUBJ_LABEL[config.subject] || config.subject}</strong></span>}
           </div>
         )}
+
         {/* Questions */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-3">
-          {!breakdown.length ? (
-            <div className="py-12 text-center text-gray-400 text-sm">No question data available</div>
-          ) : (
-            breakdown.map((q, i) => {
-              const isCorrect   = q.is_correct;
-              const notAnswered = !q.selected;
-              return (
-                <div key={q.question_id || i}
-                  className={`rounded-2xl border overflow-hidden ${notAnswered ? 'border-gray-200' : isCorrect ? 'border-emerald-200' : 'border-red-200'}`}>
-                  <div className="flex items-center gap-3 px-4 py-3"
-                       style={{ background: notAnswered ? '#f9fafb' : isCorrect ? '#f0fdf4' : '#fff1f2' }}>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-extrabold text-white shrink-0"
-                         style={{ background: notAnswered ? '#9ca3af' : isCorrect ? '#10b981' : '#ef4444' }}>
-                      {i + 1}
-                    </div>
-                    <p className="text-[13px] font-semibold flex-1 min-w-0 truncate"
-                       style={{ color: notAnswered ? '#6b7280' : isCorrect ? '#065f46' : '#991b1b' }}>
-                      {sanitizeText(q.stem) || `Question ${i + 1}`}
-                    </p>
-                    <div className="shrink-0">
-                      {notAnswered ? (
-                        <span className="text-[11px] font-bold text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">Not attempted</span>
-                      ) : isCorrect ? (
-                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">✓ Correct · +1 pt</span>
-                      ) : (
-                        <span className="text-[11px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">✗ Wrong · 0 pts</span>
-                      )}
-                    </div>
-                  </div>
-                  {(q.option_a || q.option_b) && (
-                    <div className="px-4 py-4 bg-white space-y-1.5">
-                      {['A','B','C','D'].map(letter => {
-                        const choiceText      = q['option_' + letter.toLowerCase()];
-                        if (!choiceText) return null;
-                        const isStudentAnswer = q.selected === letter;
-                        const isAnswerKey     = q.correct_answer === letter;
-                        let bg = '#f9fafb', border = '#e5e7eb', color = '#374151';
-                        if      (isStudentAnswer && isAnswerKey)  { bg = '#f0fdf4'; border = '#6ee7b7'; color = '#065f46'; }
-                        else if (isStudentAnswer && !isAnswerKey) { bg = '#fff1f2'; border = '#fca5a5'; color = '#991b1b'; }
-                        else if (!isStudentAnswer && isAnswerKey) { bg = '#f0fdf4'; border = '#a7f3d0'; color = '#065f46'; }
-                        return (
-                          <div key={letter} className="flex items-center gap-2.5 px-3 py-2 rounded-xl border"
-                               style={{ background: bg, borderColor: border }}>
-                            <div className="w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-extrabold shrink-0"
-                                 style={{ background: border, color }}>{letter}</div>
-                            <span className="text-[13px] flex-1" style={{ color }}>{sanitizeText(choiceText)}</span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {isStudentAnswer && <span className="text-[10px] font-bold" style={{ color }}>Your answer</span>}
-                              {isAnswerKey      && <span className="text-[10px] font-extrabold text-emerald-600">✓ Key</span>}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {q.explanation && (
-                    <div className="px-4 pb-4 bg-white">
-                      <div className="flex gap-2.5 p-3.5 bg-amber-50 rounded-xl border border-amber-200">
-                        <span className="text-base shrink-0">💡</span>
-                        <div>
-                          <p className="text-[11px] font-extrabold text-amber-700 uppercase tracking-wide mb-1">Explanation</p>
-                          <p className="text-[12px] text-amber-800 leading-relaxed">{sanitizeText(q.explanation)}</p>
+        {activeTab === 'questions' && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-3">
+            {!breakdown.length ? (
+              <div className="py-12 text-center text-gray-400 text-sm">No question data available</div>
+            ) : (
+              breakdown.map((q, i) => {
+
+                const isCorrect   = q.is_correct;
+                const notAnswered = !q.selected;
+                return (
+                  <div key={q.question_id || i}
+                    className={`rounded-2xl border overflow-hidden ${notAnswered ? 'border-gray-200' : isCorrect ? 'border-emerald-200' : 'border-red-200'}`}>
+                    <div className="flex items-center gap-3 px-4 py-3"
+                         style={{ background: notAnswered ? '#f9fafb' : isCorrect ? '#f0fdf4' : '#fff1f2' }}>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-extrabold text-white shrink-0"
+                           style={{ background: notAnswered ? '#9ca3af' : isCorrect ? '#10b981' : '#ef4444' }}>
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <MathContent
+                          html={sanitizeText(q.stem) || `Question ${i + 1}`}
+                          className="text-[13px] font-semibold [&_p]:m-0 [&_.katex]:text-[13px]"
+                          style={{ color: notAnswered ? '#6b7280' : isCorrect ? '#065f46' : '#991b1b' }}
+                        />
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {q.topic     && <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-2 py-0.5">{sanitizeText(q.topic)}</span>}
+                          {q.sub_topic && <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">{sanitizeText(q.sub_topic)}</span>}
+                          {q.difficulty && (
+                            <span className={`text-[10px] font-bold capitalize rounded-full px-2 py-0.5 ${q.difficulty === 'hard' ? 'bg-red-50 text-red-500' : q.difficulty === 'medium' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                              {q.difficulty}
+                            </span>
+                          )}
                         </div>
                       </div>
+                      <div className="shrink-0">
+                        {notAnswered ? (
+                          <span className="text-[11px] font-bold text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">Not attempted</span>
+                        ) : isCorrect ? (
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">✓ Correct · +1 pt</span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">✗ Wrong · 0 pts</span>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              );
-            })
+                    {(q.option_a || q.option_b) && (
+                      <div className="px-4 py-4 bg-white space-y-1.5">
+                        {['A','B','C','D'].map(letter => {
+                          const choiceText      = q['option_' + letter.toLowerCase()];
+                          if (!choiceText) return null;
+                          const isStudentAnswer = q.selected === letter;
+                          const isAnswerKey     = q.correct_answer === letter;
+                          let bg = '#f9fafb', border = '#e5e7eb', color = '#374151';
+                          if      (isStudentAnswer && isAnswerKey)  { bg = '#f0fdf4'; border = '#6ee7b7'; color = '#065f46'; }
+                          else if (isStudentAnswer && !isAnswerKey) { bg = '#fff1f2'; border = '#fca5a5'; color = '#991b1b'; }
+                          else if (!isStudentAnswer && isAnswerKey) { bg = '#f0fdf4'; border = '#a7f3d0'; color = '#065f46'; }
+                          return (
+                            <div key={letter} className="flex items-center gap-2.5 px-3 py-2 rounded-xl border"
+                                 style={{ background: bg, borderColor: border }}>
+                              <div className="w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-extrabold shrink-0"
+                                   style={{ background: border, color }}>{letter}</div>
+                              <MathContent html={sanitizeText(choiceText)} className="text-[13px] flex-1 [&_p]:m-0 [&_.katex]:text-[13px]" style={{ color }} />
+                              <div className="flex items-center gap-1 shrink-0">
+                                {isStudentAnswer && <span className="text-[10px] font-bold" style={{ color }}>Your answer</span>}
+                                {isAnswerKey      && <span className="text-[10px] font-extrabold text-emerald-600">✓ Key</span>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {q.explanation && (
+                      <div className="px-4 pb-4 bg-white">
+                        <div className="flex gap-2.5 p-3.5 bg-amber-50 rounded-xl border border-amber-200">
+                          <span className="text-base shrink-0">💡</span>
+                          <div>
+                            <p className="text-[11px] font-extrabold text-amber-700 uppercase tracking-wide mb-1">Explanation</p>
+                            <MathContent html={sanitizeText(q.explanation)} className="text-[12px] text-amber-800 leading-relaxed [&_p]:m-0" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* AI Summary */}
+        {activeTab === 'summary' && (
+          <div className="flex-1 overflow-y-auto">
+            <AISummaryView aiData={aiData} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Practice history section — grouped by Subject → Topic → Sub-topic ─────────
+function PracticeHistorySection({ sessions, loading, onView, viewLoadingId }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const groups = useMemo(() => {
+    const completed = sessions.filter(s => s.status === 'complete');
+    const result = {};
+    completed.forEach(s => {
+      const cfg      = s.practice_config_id;
+      const subject  = cfg?.subject  || s.subject  || 'general';
+      const topic    = cfg?.topic    || 'General';
+      const subTopic = cfg?.sub_topic || s.sub_topic || topic;
+      if (!result[subject]) result[subject] = {};
+      if (!result[subject][topic]) result[subject][topic] = {};
+      if (!result[subject][topic][subTopic]) result[subject][topic][subTopic] = [];
+      result[subject][topic][subTopic].push(s);
+    });
+    for (const subjectObj of Object.values(result)) {
+      for (const topicObj of Object.values(subjectObj)) {
+        for (const arr of Object.values(topicObj)) {
+          arr.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        }
+      }
+    }
+    return result;
+  }, [sessions]);
+
+  const completedCount = sessions.filter(s => s.status === 'complete').length;
+  const hasData = Object.keys(groups).length > 0;
+
+  const chevron = (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+         className={`text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+
+  return (
+    <div className="rounded-xl border border-gray-200 overflow-hidden">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center justify-between px-4 py-3.5 bg-white hover:bg-gray-50 transition-colors">
+        <div className="flex items-center gap-2.5">
+          <span className="text-base">📚</span>
+          <span className="text-sm font-semibold text-gray-700">Practice Tests</span>
+          {!loading && sessions.length > 0 && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-500">
+              {completedCount}/{sessions.length}
+            </span>
           )}
         </div>
+        {chevron}
+      </button>
+
+      {expanded && (
+        <div className="border-t border-gray-100">
+          {loading ? (
+            <div className="py-8 flex items-center justify-center text-gray-400 text-sm gap-2">
+              <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin" />
+              Loading…
+            </div>
+          ) : !hasData ? (
+            <div className="py-8 text-center text-sm text-gray-400">No practice tests taken yet.</div>
+          ) : (
+            Object.entries(groups).map(([subject, topics]) => (
+              <div key={subject}>
+                <div className="px-4 py-2 bg-teal-50 border-b border-teal-100">
+                  <span className="text-[10px] font-extrabold text-teal-600 uppercase tracking-widest">
+                    {SUBJ_LABEL[subject] || subject}
+                  </span>
+                </div>
+                {Object.entries(topics).map(([topic, subTopics]) => (
+                  <div key={topic}>
+                    <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+                      <span className="text-[11px] font-semibold text-gray-500">{topic}</span>
+                    </div>
+                    {Object.entries(subTopics).map(([subTopic, attempts]) => (
+                      <SubTopicRow key={subTopic} subTopic={subTopic} attempts={attempts} onView={onView} viewLoadingId={viewLoadingId} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubTopicRow({ subTopic, attempts, onView, viewLoadingId }) {
+  const [showAttempts, setShowAttempts] = useState(false);
+
+  const scores   = attempts.map(a => a.percentage ?? 0);
+  const best     = Math.max(...scores);
+  const latest   = scores[scores.length - 1] ?? 0;
+  const trend    = scores.length > 1 ? latest - scores[0] : null;
+  const dots     = scores.slice(-8);
+
+  const trendColor = trend === null ? '#9ca3af' : trend > 5 ? '#10b981' : trend < -5 ? '#ef4444' : '#f59e0b';
+  const trendLabel = trend === null ? null : `${trend > 0 ? '+' : ''}${trend}%`;
+
+  return (
+    <div className="border-b border-gray-50 last:border-0">
+      <div
+        className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-gray-50/60 cursor-pointer transition-colors"
+        onClick={() => setShowAttempts(e => !e)}>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-semibold text-gray-800 truncate">{subTopic}</p>
+          <p className="text-[11px] text-gray-400">{attempts.length} attempt{attempts.length !== 1 ? 's' : ''}</p>
+        </div>
+
+        {/* Mini bar trend */}
+        <div className="flex items-end gap-[3px] h-7 shrink-0">
+          {dots.map((pct, i) => (
+            <div key={i} className="w-[10px] rounded-sm transition-all"
+                 style={{ height: `${Math.max(6, Math.round(pct * 0.26))}px`, background: pct >= 60 ? '#0d9488' : pct >= 40 ? '#f59e0b' : '#ef4444', opacity: 0.8 + i * 0.025 }} />
+          ))}
+        </div>
+
+        {/* Score chips */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="text-right">
+            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-0.5">Latest</p>
+            <p className="text-[13px] font-extrabold leading-none" style={{ color: latest >= 60 ? '#0d9488' : '#f59e0b' }}>{latest}%</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-0.5">Best</p>
+            <p className="text-[13px] font-extrabold leading-none text-indigo-600">{best}%</p>
+          </div>
+          {trendLabel && (
+            <span className="text-[11px] font-extrabold w-10 text-right" style={{ color: trendColor }}>{trendLabel}</span>
+          )}
+        </div>
+
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+             className={`text-gray-300 transition-transform duration-150 shrink-0 ${showAttempts ? 'rotate-180' : ''}`}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </div>
+
+      {showAttempts && (
+        <div className="bg-slate-50/70">
+          {attempts.map((s, i) => {
+            const date = s.createdAt
+              ? new Date(s.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+              : '';
+            const pct    = s.percentage ?? 0;
+            const isDone = s.status === 'complete';
+            return (
+              <div key={s._id} className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-100 last:border-0">
+                <div className="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-500 shrink-0">
+                  {i + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] text-gray-500">Attempt {i + 1} · <span className="text-gray-400">{date}</span></p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct >= 60 ? '#0d9488' : pct >= 40 ? '#f59e0b' : '#ef4444' }} />
+                  </div>
+                  <span className="text-[12px] font-bold w-9 text-right" style={{ color: pct >= 60 ? '#0d9488' : '#f59e0b' }}>{pct}%</span>
+                </div>
+                {isDone && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onView(s); }}
+                    disabled={viewLoadingId === s._id}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 disabled:opacity-60 transition-colors shrink-0">
+                    {viewLoadingId === s._id
+                      ? <span className="w-3 h-3 inline-block rounded-full border-2 border-teal-300 border-t-teal-700 animate-spin" />
+                      : 'View'}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Full Length Result Modal (Math + R&W combined) ────────────
+function FullLengthResultModal({ result, onClose }) {
+  const data = result.data;
+  const [activeSubject, setActiveSubject] = useState(data.rw ? 'rw' : 'math');
+  const [activeTab, setActiveTab]         = useState('questions');
+  const [activeModule, setActiveModule]   = useState('m1');
+
+  useEffect(() => { setActiveTab('questions'); setActiveModule('m1'); }, [activeSubject]);
+
+  const session = activeSubject === 'rw' ? data.rw : data.math;
+
+  const topicMastery = useMemo(
+    () => session ? computeSatTopicMastery(session) : {},
+    [session],
+  );
+  const hasTopics = Object.keys(topicMastery).length > 0 &&
+    Object.values(topicMastery).some(g => Object.keys(g).length > 0);
+
+  const sessScore = session ? (session.total_score ?? ((session.module_1?.score || 0) + (session.module_2?.score || 0))) : 0;
+  const sessMax   = session ? ((session.module_1?.max_score || 0) + (session.module_2?.max_score || 0)) : 0;
+  const sessPct   = sessMax > 0 ? Math.round((sessScore / sessMax) * 100) : 0;
+
+  const aiData = useMemo(
+    () => hasTopics ? generateSatAISummary(topicMastery, sessPct) : null,
+    [topicMastery, sessPct, hasTopics],
+  );
+
+  const testName = data.full_length_exam_config_id?.name || 'Full Length Test';
+
+  const mathScore  = data.math ? (data.math.total_score ?? ((data.math.module_1?.score || 0) + (data.math.module_2?.score || 0))) : 0;
+  const mathMax    = data.math ? ((data.math.module_1?.max_score || 0) + (data.math.module_2?.max_score || 0)) : 0;
+  const rwScore    = data.rw   ? (data.rw.total_score   ?? ((data.rw.module_1?.score   || 0) + (data.rw.module_2?.score   || 0))) : 0;
+  const rwMax      = data.rw   ? ((data.rw.module_1?.max_score   || 0) + (data.rw.module_2?.max_score   || 0)) : 0;
+  const totalScore = mathScore + rwScore;
+  const totalMax   = mathMax + rwMax;
+  const totalPct   = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0;
+  const passed     = totalPct >= 60;
+
+  const MODAL_TABS = [
+    { key: 'questions', label: 'Questions' },
+    ...(hasTopics ? [{ key: 'topics', label: 'Topic Mastery' }] : []),
+    ...(hasTopics ? [{ key: 'charts', label: 'Charts' }] : []),
+    { key: 'summary', label: 'AI Summary' },
+  ];
+
+  const m1 = session?.module_1;
+  const m2 = session?.module_2;
+  const modules = [
+    m1 && { key: 'm1', label: 'Module 1', data: m1 },
+    m2 && { key: 'm2', label: `Module 2 · ${m2?.tier === 'hard' ? 'Advanced' : 'Standard'}`, data: m2 },
+  ].filter(Boolean);
+  const activeModuleData = activeModule === 'm1' ? m1 : m2;
+
+  return (
+    <div className="fixed inset-0 z-[1200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
+           style={{ boxShadow: '0 25px 80px rgba(0,0,0,0.35)' }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 shrink-0"
+             style={{ background: 'linear-gradient(135deg,#1e1b4b,#312e81)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-extrabold text-white shrink-0"
+                 style={{ background: 'rgba(255,255,255,0.2)' }}>📝</div>
+            <div>
+              <h3 className="text-sm font-extrabold text-white">Full Length Score Report</h3>
+              <p className="text-xs text-indigo-300 mt-0.5">{testName}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 text-white">
+              <span className="text-sm font-extrabold">{totalScore}/{totalMax}</span>
+              <span className="text-[11px] opacity-70">({totalPct}%)</span>
+              <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold ${passed ? 'bg-emerald-400 text-white' : 'bg-red-400 text-white'}`}>
+                {passed ? 'PASSED' : 'FAILED'}
+              </span>
+            </div>
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-white/15 text-white hover:bg-white/30 flex items-center justify-center text-sm font-bold transition-colors">
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Subject selector */}
+        <div className="shrink-0 flex border-b border-gray-200 bg-gray-50 px-5">
+          {[
+            data.rw   && { key: 'rw',   label: 'Reading & Writing', score: rwScore,   max: rwMax },
+            data.math && { key: 'math', label: 'Mathematics',       score: mathScore, max: mathMax },
+          ].filter(Boolean).map(s => (
+            <button key={s.key} onClick={() => setActiveSubject(s.key)}
+              className={`flex-1 py-3 text-[12px] font-bold border-b-2 transition-all ${activeSubject === s.key ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-400'}`}>
+              {s.label}
+              <span className="ml-1.5 text-[11px] font-normal opacity-70">{s.score}/{s.max}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Tab bar */}
+        <div className="shrink-0 border-b border-gray-100 bg-white px-5 pt-3 flex gap-1">
+          {MODAL_TABS.map(t => (
+            <button key={t.key} onClick={() => setActiveTab(t.key)}
+              className="px-4 py-1.5 rounded-t-lg text-[12px] font-bold border-b-2 transition-all"
+              style={activeTab === t.key
+                ? { borderColor: '#4f46e5', color: '#4f46e5', background: '#fff' }
+                : { borderColor: 'transparent', color: '#9ca3af' }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Module tabs (questions only) */}
+        {activeTab === 'questions' && modules.length > 0 && (
+          <div className="shrink-0 border-b border-gray-100 bg-gray-50">
+            <div className="flex gap-1 px-5 py-2">
+              {modules.map(({ key, label, data: mdata }) => (
+                <button key={key} onClick={() => setActiveModule(key)}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold transition-all"
+                  style={activeModule === key
+                    ? { background: '#4f46e5', color: '#fff' }
+                    : { background: '#f3f4f6', color: '#9ca3af' }}>
+                  {label}
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold"
+                        style={activeModule === key
+                          ? { background: 'rgba(255,255,255,0.25)', color: '#fff' }
+                          : { background: '#e5e7eb', color: '#6b7280' }}>
+                    {mdata.score}/{mdata.max_score}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Module meta bar (questions only) */}
+        {activeTab === 'questions' && activeModuleData && (
+          <div className="flex items-center gap-4 px-5 py-3 shrink-0" style={{ background: '#eef2ff' }}>
+            <span className="font-bold text-indigo-700 text-sm">
+              {activeModule === 'm1' ? 'Module 1' : `Module 2 · ${activeModuleData.tier === 'hard' ? 'Advanced' : 'Standard'}`}
+            </span>
+            <span className="text-gray-500 text-xs">⭐ {activeModuleData.score} / {activeModuleData.max_score} pts</span>
+            <span className="text-gray-500 text-xs">{activeModuleData.breakdown?.length || 0} questions</span>
+            <div className="ml-auto w-28 h-2 bg-indigo-200 rounded-full overflow-hidden">
+              <div className="h-full rounded-full"
+                   style={{ width: `${activeModuleData.percentage}%`, background: activeModuleData.percentage >= 60 ? '#10b981' : '#ef4444' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Questions */}
+        {activeTab === 'questions' && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-3">
+            {!activeModuleData?.breakdown?.length ? (
+              <div className="py-12 text-center text-gray-400 text-sm">No question data available</div>
+            ) : (
+              activeModuleData.breakdown.map((q, i) => {
+                const isCorrect   = q.is_correct;
+                const notAnswered = !q.selected;
+                return (
+                  <div key={q.question_id || i}
+                    className={`rounded-2xl border overflow-hidden ${notAnswered ? 'border-gray-200' : isCorrect ? 'border-emerald-200' : 'border-red-200'}`}>
+                    <div className="flex items-center gap-3 px-4 py-3"
+                         style={{ background: notAnswered ? '#f9fafb' : isCorrect ? '#f0fdf4' : '#fff1f2' }}>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-extrabold text-white shrink-0"
+                           style={{ background: notAnswered ? '#9ca3af' : isCorrect ? '#10b981' : '#ef4444' }}>
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <MathContent
+                          html={sanitizeText(q.stem) || `Question ${i + 1}`}
+                          className="text-[13px] font-semibold [&_p]:m-0 [&_.katex]:text-[13px]"
+                          style={{ color: notAnswered ? '#6b7280' : isCorrect ? '#065f46' : '#991b1b' }}
+                        />
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {q.topic     && <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-full px-2 py-0.5">{sanitizeText(q.topic)}</span>}
+                          {q.sub_topic && <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 rounded-full px-2 py-0.5">{sanitizeText(q.sub_topic)}</span>}
+                          {q.difficulty && (
+                            <span className={`text-[10px] font-bold capitalize rounded-full px-2 py-0.5 ${q.difficulty === 'hard' ? 'bg-red-50 text-red-500' : q.difficulty === 'medium' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                              {q.difficulty}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        {notAnswered ? (
+                          <span className="text-[11px] font-bold text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">Not attempted</span>
+                        ) : isCorrect ? (
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">✓ Correct · +1 pt</span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">✗ Wrong · 0 pts</span>
+                        )}
+                      </div>
+                    </div>
+                    {(q.option_a || q.option_b) && (
+                      <div className="px-4 py-4 bg-white space-y-1.5">
+                        {['A','B','C','D'].map(letter => {
+                          const choiceText      = q['option_' + letter.toLowerCase()];
+                          if (!choiceText) return null;
+                          const isStudentAnswer = q.selected === letter;
+                          const isAnswerKey     = q.correct_answer === letter;
+                          let bg = '#f9fafb', border = '#e5e7eb', color = '#374151';
+                          if      (isStudentAnswer && isAnswerKey)  { bg = '#f0fdf4'; border = '#6ee7b7'; color = '#065f46'; }
+                          else if (isStudentAnswer && !isAnswerKey) { bg = '#fff1f2'; border = '#fca5a5'; color = '#991b1b'; }
+                          else if (!isStudentAnswer && isAnswerKey) { bg = '#f0fdf4'; border = '#a7f3d0'; color = '#065f46'; }
+                          return (
+                            <div key={letter} className="flex items-center gap-2.5 px-3 py-2 rounded-xl border"
+                                 style={{ background: bg, borderColor: border }}>
+                              <div className="w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-extrabold shrink-0"
+                                   style={{ background: border, color }}>{letter}</div>
+                              <MathContent html={sanitizeText(choiceText)} className="text-[13px] flex-1 [&_p]:m-0 [&_.katex]:text-[13px]" style={{ color }} />
+                              <div className="flex items-center gap-1 shrink-0">
+                                {isStudentAnswer && <span className="text-[10px] font-bold" style={{ color }}>Your answer</span>}
+                                {isAnswerKey      && <span className="text-[10px] font-extrabold text-emerald-600">✓ Key</span>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {q.explanation && (
+                      <div className="px-4 pb-4 bg-white">
+                        <div className="flex gap-2.5 p-3.5 bg-amber-50 rounded-xl border border-amber-200">
+                          <span className="text-base shrink-0">💡</span>
+                          <div>
+                            <p className="text-[11px] font-extrabold text-amber-700 uppercase tracking-wide mb-1">Explanation</p>
+                            <MathContent html={sanitizeText(q.explanation)} className="text-[12px] text-amber-800 leading-relaxed [&_p]:m-0" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Topic Mastery */}
+        {activeTab === 'topics' && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            {Object.entries(topicMastery).map(([groupName, topics]) => (
+              <div key={groupName} className="rounded-xl overflow-hidden border border-gray-200">
+                <div className="bg-gray-800 px-4 py-3">
+                  <p className="text-sm font-bold text-white">{groupName}</p>
+                </div>
+                <div className="grid grid-cols-[1fr_auto_160px] bg-gray-700 px-4 py-2">
+                  <span className="text-[10px] font-extrabold text-gray-300 uppercase tracking-widest">Topic</span>
+                  <span className="text-[10px] font-extrabold text-gray-300 uppercase tracking-widest text-center px-6">Mastery</span>
+                  <span className="text-[10px] font-extrabold text-gray-300 uppercase tracking-widest text-right">Score</span>
+                </div>
+                {Object.entries(topics).map(([topic, tdata]) => {
+                  const pct     = tdata.maxScore > 0 ? Math.round((tdata.score / tdata.maxScore) * 100) : 0;
+                  const mastery = getMasteryLevel(pct);
+                  return (
+                    <div key={topic} className="grid grid-cols-[1fr_auto_160px] items-center px-4 py-3 border-t border-gray-100 bg-white">
+                      <div>
+                        <p className="text-[13px] text-gray-700">{topic}</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">{tdata.correct}/{tdata.total} correct</p>
+                      </div>
+                      <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full mx-6"
+                            style={{ background: mastery.bg, color: mastery.color }}>
+                        {mastery.label}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: mastery.bar }} />
+                        </div>
+                        <span className="text-[10px] font-bold shrink-0 w-8 text-right" style={{ color: mastery.bar }}>{pct}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Charts */}
+        {activeTab === 'charts' && (
+          <div className="flex-1 overflow-y-auto">
+            <TopicCharts topicMastery={topicMastery} />
+          </div>
+        )}
+
+        {/* AI Summary */}
+        {activeTab === 'summary' && (
+          <div className="flex-1 overflow-y-auto">
+            <AISummaryView aiData={aiData} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -888,10 +1542,11 @@ export default function StudentProfile() {
   const [practiceSessions,  setPracticeSessions]  = useState([]);
   const [satSessionsLoading, setSatSessionsLoading] = useState(true);
 
-  const [adaptiveResult, setAdaptiveResult]         = useState(null);
+  const [adaptiveResult, setAdaptiveResult]               = useState(null);
   const [adaptiveResultLoading, setAdaptiveResultLoading] = useState(null);
-  const [practiceResult, setPracticeResult]         = useState(null);
+  const [practiceResult, setPracticeResult]               = useState(null);
   const [practiceResultLoading, setPracticeResultLoading] = useState(null);
+  const [fullLengthResult, setFullLengthResult]           = useState(null);
 
   useEffect(() => {
     studentService.getById(id)
@@ -914,10 +1569,19 @@ export default function StudentProfile() {
     if (adaptiveResultLoading) return;
     setAdaptiveResultLoading(session._id);
     try {
-      const res = await satMentorService.getSessionResults(session._id);
-      setAdaptiveResult({ session: res.data, assignment: { exam_config_id: session.exam_config_id } });
+      if (session.session_type === 'full_length') {
+        const res = await satMentorService.getFullLengthResults(session._id);
+        setFullLengthResult({ data: res.data });
+      } else {
+        const res = await satMentorService.getSessionResults(session._id);
+        setAdaptiveResult({ session: res.data, assignment: { exam_config_id: session.exam_config_id } });
+      }
     } catch {
-      setAdaptiveResult({ session: null, assignment: { exam_config_id: session.exam_config_id } });
+      if (session.session_type === 'full_length') {
+        setFullLengthResult(null);
+      } else {
+        setAdaptiveResult({ session: null, assignment: { exam_config_id: session.exam_config_id } });
+      }
     } finally {
       setAdaptiveResultLoading(null);
     }
@@ -1149,10 +1813,7 @@ export default function StudentProfile() {
                 onView={handleViewAdaptiveResult}
                 viewLoadingId={adaptiveResultLoading}
               />
-              <SatTestSection
-                label="Practice Tests"
-                icon="📚"
-                accentColor="#0d9488"
+              <PracticeHistorySection
                 sessions={practiceSessions}
                 loading={satSessionsLoading}
                 onView={handleViewPracticeResult}
@@ -1206,6 +1867,13 @@ export default function StudentProfile() {
           session={adaptiveResult.session}
           assignment={adaptiveResult.assignment}
           onClose={() => setAdaptiveResult(null)}
+        />
+      )}
+
+      {fullLengthResult && (
+        <FullLengthResultModal
+          result={fullLengthResult}
+          onClose={() => setFullLengthResult(null)}
         />
       )}
 

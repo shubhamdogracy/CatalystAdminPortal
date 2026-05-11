@@ -87,10 +87,19 @@ export const satAdminService = {
 };
 
 export const satMentorService = {
-  getStudentSessions:         (studentId) => req(`/sat/mentor/student/${studentId}/sessions`),
-  getStudentPracticeSessions: (studentId) => req(`/sat/mentor/student/${studentId}/practice-sessions`),
-  getSessionResults:          (sessionId) => req(`/sat/mentor/sessions/${sessionId}/results`),
-  getPracticeResults:         (sessionId) => req(`/sat/mentor/practice-sessions/${sessionId}/results`),
+  // Available test configs (for assign page)
+  getAvailableTests:          ()            => req('/sat/mentor/exam-configs'),
+  // Assignment management (for assign page)
+  assignTest:                 (payload)     => req('/sat/mentor/assign', { method: 'POST', body: JSON.stringify(payload) }),
+  assignBatch:                (payload)     => req('/sat/mentor/assign/batch', { method: 'POST', body: JSON.stringify(payload) }),
+  getAssignments:             (params = {}) => { const qs = new URLSearchParams(params).toString(); return req(`/sat/mentor/assignments${qs ? `?${qs}` : ''}`); },
+  getAssignmentResults:       (id)          => req(`/sat/mentor/assignments/${id}/results`),
+  // Student session history (for student profile — all sessions, not just assigned)
+  getStudentSessions:         (studentId)   => req(`/sat/mentor/student/${studentId}/sessions`),
+  getStudentPracticeSessions: (studentId)   => req(`/sat/mentor/student/${studentId}/practice-sessions`),
+  getSessionResults:          (sessionId)   => req(`/sat/mentor/sessions/${sessionId}/results`),
+  getPracticeResults:         (sessionId)   => req(`/sat/mentor/practice-sessions/${sessionId}/results`),
+  getFullLengthResults:       (sessionId)   => req(`/sat/mentor/full-length-sessions/${sessionId}/results`),
 };
 
 export const chatService = {

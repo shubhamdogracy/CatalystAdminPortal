@@ -19,7 +19,15 @@
       "Bash(Remove-Item -Path \"C:\\\\Users\\\\Shubham\\\\WebstormProjects\\\\catalyst_admin\\\\Catalyst_admin\\\\src\\\\components\\\\mentor\\\\assignments\\\\AssignmentsPage.jsx\" -Force)",
       "Bash(Remove-Item -Path \"C:\\\\Users\\\\Shubham\\\\WebstormProjects\\\\catalyst_admin\\\\Catalyst_admin\\\\src\\\\components\\\\student\" -Recurse -Force)",
       "Bash(Write-Output \"Done\")",
-      "PowerShell(Remove-Item *)"
+      "PowerShell(Remove-Item *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\users\\\\shubham\\\\webstormprojects\\\\catalyst_student_server\" -Recurse -Directory | Where-Object {$_.Name -match '^\\(routes|controllers|src\\)$'} | Select-Object -ExpandProperty FullName)",
+      "Bash(grep -E \"\\(index|server|app\\)\\\\.js$\")",
+      "Bash(curl -s \"http://localhost:8000/api/sat/mentor/student/test123/sessions\")",
+      "Bash(curl -s \"http://localhost:8000/api/sat/mentor/student/test/sessions\")",
+      "Bash(curl -s \"http://localhost:8000/api/sat/mentor/student/test/practice-sessions\")",
+      "Bash(curl -s \"http://localhost:8000/api/sat/mentor/sessions/test/results\")",
+      "Bash(curl -s \"http://localhost:8000/api/sat/mentor/practice-sessions/test/results\")",
+      "Bash(xargs grep -l \"history\")"
     ]
   }
 }

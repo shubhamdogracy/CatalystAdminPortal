@@ -1,37 +1,46 @@
-import { useEffect, useRef } from 'react';
+import katex from 'katex';
 import 'katex/dist/katex.min.css';
-import renderMathInElement from 'katex/contrib/auto-render';
+import { useMemo } from 'react';
 
-const KATEX_OPTS = {
-  delimiters: [
-    { left: '$$', right: '$$', display: true  },
-    { left: '$',  right: '$',  display: false },
-    { left: '\\(', right: '\\)', display: false },
-    { left: '\\[', right: '\\]', display: true  },
-  ],
-  // Never touch SVG or image nodes — they may contain $ symbols in text/title/desc
-  ignoredTags: [
-    'script', 'noscript', 'style', 'textarea', 'pre', 'code',
-    'annotation', 'annotation-xml', 'svg', 'img', 'figure', 'figcaption',
-  ],
-  throwOnError: false,
+const renderLatex = (source) => {
+  if (!source) return source;
+  let out = source;
+
+  // Display math: $$...$$  (process before inline to avoid partial matches)
+  out = out.replace(/\$\$([\s\S]+?)\$\$/g, (match, tex) => {
+    try { return katex.renderToString(tex.trim(), { displayMode: true, throwOnError: false }); }
+    catch { return match; }
+  });
+
+  // Display math: \[...\]
+  out = out.replace(/\\\[([\s\S]+?)\\\]/g, (match, tex) => {
+    try { return katex.renderToString(tex.trim(), { displayMode: true, throwOnError: false }); }
+    catch { return match; }
+  });
+
+  // Inline math: \(...\)
+  out = out.replace(/\\\(([\s\S]+?)\\\)/g, (match, tex) => {
+    try { return katex.renderToString(tex.trim(), { displayMode: false, throwOnError: false }); }
+    catch { return match; }
+  });
+
+  // Inline math: $...$  (no newlines inside, avoids double-dollar already consumed)
+  out = out.replace(/\$([^$\n]+?)\$/g, (match, tex) => {
+    try { return katex.renderToString(tex.trim(), { displayMode: false, throwOnError: false }); }
+    catch { return match; }
+  });
+
+  return out;
 };
 
-export default function MathContent({ html, className = '' }) {
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (ref.current) renderMathInElement(ref.current, KATEX_OPTS);
-  }, [html]);
-
-  if (!html) return null;
-
+export default function MathContent({ html, className = '', style }) {
+  const rendered = useMemo(() => renderLatex(html), [html]);
+  if (!rendered) return null;
   return (
     <div
-      ref={ref}
-      // sat-content applies SVG sizing, sr-only hiding, p spacing (see index.css)
       className={`sat-content ${className}`}
-      dangerouslySetInnerHTML={{ __html: html }}
+      style={style}
+      dangerouslySetInnerHTML={{ __html: rendered }}
     />
   );
 }
