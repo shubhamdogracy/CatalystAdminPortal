@@ -22,6 +22,7 @@ import AnalyticsPage      from './components/mentor/analytics/AnalyticsPage';
 import CommunicationPage  from './components/mentor/communication/CommunicationPage';
 import NotificationsPage  from './components/mentor/notifications/NotificationsPage';
 import ProfilePage        from './components/common/ProfilePage';
+import SatAssignPage      from './components/mentor/sat/SatAssignPage';
 
 // ── Operations routes ───────────────────────────────────────
 import OpsLayout          from './components/operations/OpsLayout';
@@ -67,6 +68,7 @@ export default function App() {
                             <Route path="sessions"      element={<SessionsPage />} />
                             <Route path="analytics"     element={<AnalyticsPage />} />
                             {/*<Route path="assignments"   element={<AssignmentsPage />} />*/}
+                            <Route path="sat-tests"      element={<SatAssignPage />} />
                             <Route path="communication" element={<CommunicationPage />} />
                             <Route path="notifications" element={<NotificationsPage />} />
                             <Route path="profile"       element={<ProfilePage />} />
