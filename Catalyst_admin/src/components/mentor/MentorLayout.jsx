@@ -15,7 +15,7 @@ const PAGE_TITLES = {
   '/mentor/slots':         'Slot Management',
   '/mentor/sessions':      'Sessions',
   '/mentor/analytics':     'Analytics',
-  '/mentor/communication': 'Communication',
+  '/mentor/communication': 'Chat',
   '/mentor/notifications': 'Notifications',
   '/mentor/profile':       'My Profile',
 };

@@ -38,6 +38,11 @@ export default function MockTestsPage() {
   const openCreate = () => { setEditing(null); setShowModal(true); };
   const openEdit   = (cfg) => { setEditing(cfg); setShowModal(true); };
 
+  const handleToggleDemo = async (g, newValue) => {
+    await satAdminService.patchPairDemoAccess(g.math?._id, g.rw?._id, newValue);
+    loadConfigs();
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6">
       {/* Header */}
@@ -83,6 +88,7 @@ export default function MockTestsPage() {
               mathConfig={g.math}
               rwConfig={g.rw}
               onEdit={openEdit}
+              onToggleDemo={(newVal) => handleToggleDemo(g, newVal)}
               type="mock"
             />
           ))}

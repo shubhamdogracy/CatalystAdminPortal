@@ -672,11 +672,14 @@ function SatScoreModal({ session, assignment, onClose }) {
 // "Diagnostic-Test-1 — Reading & Writing") into one combined card.
 const SERIES_RE = / — (Math|Reading & Writing)$/;
 
+// ── Score colour helpers ───────────────────────────────────────────────────────
+const scoreColor = pct => pct >= 80 ? '#059669' : pct >= 60 ? '#0891b2' : pct >= 40 ? '#d97706' : '#dc2626';
+const scoreBg    = pct => pct >= 80 ? '#ecfdf5' : pct >= 60 ? '#ecfeff' : pct >= 40 ? '#fffbeb' : '#fef2f2';
+
 function SatTestSection({ label, icon, accentColor, sessions, loading, onView, viewLoadingId }) {
   const [expanded, setExpanded] = useState(false);
   const completed = sessions.filter(s => s.status === 'complete' || s.status === 'completed').length;
 
-  // Build display rows: full_length entries pass through; standalone series sessions are grouped
   const displayRows = useMemo(() => {
     const fullLengthRows = sessions
       .filter(s => s.session_type === 'full_length')
@@ -718,76 +721,113 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, v
   const ViewBtn = ({ s }) => {
     const isDone = s.status === 'complete' || s.status === 'completed';
     if (!isDone) return (
-      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
+      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${s.status === 'pending' ? 'bg-slate-100 text-slate-500' : 'bg-amber-100 text-amber-600'}`}>
         {s.status === 'pending' ? 'Pending' : 'In Progress'}
       </span>
     );
     return (
       <button onClick={() => onView(s)} disabled={viewLoadingId === s._id}
-        className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded-lg disabled:opacity-60 transition-colors">
+        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold text-white disabled:opacity-60 transition-all hover:shadow-sm active:scale-95"
+        style={{ background: 'linear-gradient(135deg,#0d9488,#059669)' }}>
         {viewLoadingId === s._id
-          ? <span className="w-3 h-3 rounded-full border-2 border-indigo-300 border-t-indigo-700 animate-spin inline-block" />
-          : 'View'}
+          ? <span className="w-3 h-3 rounded-full border-2 border-white/40 border-t-white animate-spin inline-block" />
+          : 'View →'}
       </button>
     );
   };
 
+  const completionPct = sessions.length > 0 ? Math.round((completed / sessions.length) * 100) : 0;
+
   return (
-    <div className="rounded-xl border border-gray-200 overflow-hidden">
+    <div className={`rounded-2xl border overflow-hidden transition-all duration-200 ${expanded ? 'shadow-md' : 'shadow-sm hover:shadow-md'}`}
+         style={{ borderColor: expanded ? `${accentColor}55` : '#e5e7eb' }}>
+
+      {/* ── Header ── */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center justify-between px-4 py-3.5 bg-white hover:bg-gray-50 transition-colors">
-        <div className="flex items-center gap-2.5">
-          <span className="text-base">{icon}</span>
-          <span className="text-sm font-semibold text-gray-700">{label}</span>
+        className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-slate-50/70 transition-colors group">
+        <div className="flex items-center gap-3">
+          {/* Icon box */}
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-sm"
+               style={{ background: `linear-gradient(135deg,${accentColor}22,${accentColor}44)`, border: `1.5px solid ${accentColor}33` }}>
+            {icon}
+          </div>
+          <div>
+            <p className="text-sm font-bold text-slate-800 leading-tight">{label}</p>
+            {!loading && sessions.length > 0 && (
+              <p className="text-[11px] text-slate-400 mt-0.5">{completed} of {sessions.length} completed</p>
+            )}
+          </div>
           {!loading && sessions.length > 0 && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-500">
-              {completed}/{sessions.length}
+            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full"
+                  style={{ background: `${accentColor}18`, color: accentColor }}>
+              {completionPct}%
             </span>
           )}
         </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-             className={`text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${expanded ? 'rotate-180' : ''}`}
+             style={{ background: expanded ? `${accentColor}18` : '#f1f5f9' }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+               style={{ color: expanded ? accentColor : '#94a3b8' }}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
       </button>
 
+      {/* ── Body ── */}
       {expanded && (
-        <div className="border-t border-gray-100">
+        <div style={{ borderTop: `2px solid ${accentColor}22` }}>
           {loading ? (
-            <div className="py-8 flex items-center justify-center text-gray-400 text-sm gap-2">
-              <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin" />
-              Loading…
+            <div className="py-10 flex items-center justify-center gap-2.5 text-slate-400 text-sm bg-slate-50/40">
+              <span className="w-4 h-4 border-2 border-slate-200 border-t-slate-500 rounded-full animate-spin" />
+              Loading sessions…
             </div>
           ) : displayRows.length === 0 ? (
-            <div className="py-8 text-center text-sm text-gray-400">No {label.toLowerCase()} taken yet.</div>
+            <div className="py-12 flex flex-col items-center gap-2 text-slate-400 bg-slate-50/40">
+              <span className="text-3xl opacity-40">{icon}</span>
+              <p className="text-sm">No {label.toLowerCase()} taken yet.</p>
+            </div>
           ) : (
-            <div className="divide-y divide-gray-50">
-              {displayRows.map(row => {
-                /* ── Full-length or single-subject session ── */
+            <div className="divide-y divide-slate-100 bg-slate-50/30">
+              {displayRows.map((row, idx) => {
+
+                /* ── Full-length or single-subject ── */
                 if (row.type === 'full_length' || row.type === 'single') {
-                  const s    = row.session;
-                  const pct  = s.percentage ?? s.total_percentage ?? null;
-                  const name = s.full_length_exam_config_id?.name || s.exam_config_id?.name || 'Test';
-                  const subj = SUBJ_LABEL[s.exam_config_id?.subject] || '';
-                  const date = fmtDate(s.createdAt);
+                  const s      = row.session;
+                  const pct    = s.percentage ?? s.total_percentage ?? null;
+                  const name   = s.full_length_exam_config_id?.name || s.exam_config_id?.name || 'Test';
+                  const subj   = SUBJ_LABEL[s.exam_config_id?.subject] || '';
+                  const date   = fmtDate(s.createdAt);
                   const isDone = s.status === 'complete' || s.status === 'completed';
                   return (
-                    <div key={s._id} className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base" style={{ background: `${accentColor}18` }}>{icon}</div>
+                    <div key={s._id}
+                         className="flex items-center gap-3 px-5 py-3.5 bg-white hover:bg-slate-50 transition-colors">
+                      {/* Index badge */}
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+                           style={{ background: `${accentColor}18`, color: accentColor }}>
+                        {idx + 1}
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-gray-800 truncate">{name}</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">{[subj, date].filter(Boolean).join(' · ')}</p>
+                        <p className="text-[13px] font-semibold text-slate-800 truncate">{name}</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{[subj, date].filter(Boolean).join(' · ')}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {pct !== null && <span className={`text-[12px] font-bold ${pct >= 60 ? 'text-emerald-600' : 'text-red-500'}`}>{pct}%</span>}
+                        {pct !== null && (
+                          <span className="text-[12px] font-extrabold px-2 py-0.5 rounded-lg"
+                                style={{ color: scoreColor(pct), background: scoreBg(pct) }}>
+                            {pct}%
+                          </span>
+                        )}
                         {isDone ? (
                           <button onClick={() => onView(s)} disabled={viewLoadingId === s._id}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-60 transition-colors">
-                            {viewLoadingId === s._id ? <span className="w-3 h-3 rounded-full border-2 border-indigo-300 border-t-indigo-700 animate-spin" /> : 'View Results'}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold text-white disabled:opacity-60 transition-all hover:shadow-md active:scale-95"
+                            style={{ background: 'linear-gradient(135deg,#0d9488,#059669)' }}>
+                            {viewLoadingId === s._id
+                              ? <span className="w-3 h-3 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                              : 'View Results →'}
                           </button>
                         ) : (
-                          <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${s.status === 'pending' ? 'bg-gray-100 text-gray-500' : 'bg-amber-50 text-amber-600'}`}>
+                          <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${s.status === 'pending' ? 'bg-slate-100 text-slate-500' : 'bg-amber-100 text-amber-600'}`}>
                             {s.status === 'pending' ? 'Pending' : 'In Progress'}
                           </span>
                         )}
@@ -796,47 +836,75 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, v
                   );
                 }
 
-                /* ── Series group (e.g., "Diagnostic-Test-1 — Math" + "— R&W") ── */
+                /* ── Series group ── */
                 const { series, math, rw } = row;
                 const latestMath = [...math].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0];
-                const latestRw   = [...rw].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))[0];
+                const latestRw   = [...rw].sort((a, b)   => +new Date(b.createdAt) - +new Date(a.createdAt))[0];
                 const mathPct    = latestMath ? (latestMath.total_percentage ?? null) : null;
                 const rwPct      = latestRw   ? (latestRw.total_percentage   ?? null) : null;
                 const date       = fmtDate(latestMath?.createdAt || latestRw?.createdAt);
+                const totalSessions = math.length + rw.length;
 
                 return (
-                  <div key={series} className="px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base mt-0.5" style={{ background: `${accentColor}18` }}>{icon}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <p className="text-[13px] font-semibold text-gray-800">{series}</p>
-                          {date && <span className="text-[11px] text-gray-400 shrink-0">{date}</span>}
+                  <div key={series} className="bg-white hover:bg-slate-50/60 transition-colors">
+                    {/* Series header strip */}
+                    <div className="flex items-center justify-between px-5 pt-4 pb-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0"
+                             style={{ background: `${accentColor}18`, border: `1.5px solid ${accentColor}33` }}>
+                          {icon}
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          {/* Math panel */}
-                          <div className="rounded-lg px-2.5 py-2" style={{ background: '#f5f3ff', border: '1px solid #e9d5ff' }}>
-                            <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1.5">Math</p>
-                            {latestMath ? (
-                              <div className="flex items-center justify-between gap-1">
-                                {mathPct !== null && <span className={`text-[13px] font-bold ${mathPct >= 60 ? 'text-emerald-600' : 'text-red-500'}`}>{mathPct}%</span>}
-                                <ViewBtn s={latestMath} />
-                              </div>
-                            ) : <span className="text-[11px] text-gray-400">Not taken</span>}
+                        <p className="text-[13px] font-bold text-slate-800">{series}</p>
+                        {totalSessions > 2 && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                            {totalSessions} sessions
+                          </span>
+                        )}
+                      </div>
+                      {date && <span className="text-[11px] text-slate-400">{date}</span>}
+                    </div>
+
+                    {/* Math + R&W panels */}
+                    <div className="grid grid-cols-2 gap-3 px-5 pb-4">
+                      {/* Math */}
+                      <div className="rounded-xl p-3.5 flex flex-col gap-2" style={{ background: 'linear-gradient(135deg,#faf5ff,#f3e8ff)', border: '1.5px solid #e9d5ff' }}>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-4 h-4 rounded bg-purple-200 flex items-center justify-center">
+                            <span className="text-[8px] font-black text-purple-700">M</span>
                           </div>
-                          {/* R&W panel */}
-                          <div className="rounded-lg px-2.5 py-2" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-                            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1.5">Reading &amp; Writing</p>
-                            {latestRw ? (
-                              <div className="flex items-center justify-between gap-1">
-                                {rwPct !== null && <span className={`text-[13px] font-bold ${rwPct >= 60 ? 'text-emerald-600' : 'text-red-500'}`}>{rwPct}%</span>}
-                                <ViewBtn s={latestRw} />
-                              </div>
-                            ) : <span className="text-[11px] text-gray-400">Not taken</span>}
-                          </div>
+                          <p className="text-[10px] font-extrabold text-purple-700 uppercase tracking-wider">Math</p>
                         </div>
-                        {(math.length + rw.length) > 2 && (
-                          <p className="text-[10px] text-gray-400 mt-1.5">{math.length + rw.length} total sessions</p>
+                        {latestMath ? (
+                          <div className="flex items-center justify-between gap-1 mt-0.5">
+                            {mathPct !== null ? (
+                              <span className="text-[15px] font-black"
+                                    style={{ color: scoreColor(mathPct) }}>{mathPct}%</span>
+                            ) : <span className="text-[11px] text-slate-400">—</span>}
+                            <ViewBtn s={latestMath} />
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 italic">Not taken</p>
+                        )}
+                      </div>
+
+                      {/* R&W */}
+                      <div className="rounded-xl p-3.5 flex flex-col gap-2" style={{ background: 'linear-gradient(135deg,#eff6ff,#dbeafe)', border: '1.5px solid #bfdbfe' }}>
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-4 h-4 rounded bg-blue-200 flex items-center justify-center">
+                            <span className="text-[8px] font-black text-blue-700">R</span>
+                          </div>
+                          <p className="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider">R&amp;W</p>
+                        </div>
+                        {latestRw ? (
+                          <div className="flex items-center justify-between gap-1 mt-0.5">
+                            {rwPct !== null ? (
+                              <span className="text-[15px] font-black"
+                                    style={{ color: scoreColor(rwPct) }}>{rwPct}%</span>
+                            ) : <span className="text-[11px] text-slate-400">—</span>}
+                            <ViewBtn s={latestRw} />
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 italic">Not taken</p>
                         )}
                       </div>
                     </div>
@@ -1067,61 +1135,100 @@ function PracticeHistorySection({ sessions, loading, onView, viewLoadingId }) {
   }, [sessions]);
 
   const completedCount = sessions.filter(s => s.status === 'complete').length;
-  const hasData = Object.keys(groups).length > 0;
+  const hasData        = Object.keys(groups).length > 0;
+  const completionPct  = sessions.length > 0 ? Math.round((completedCount / sessions.length) * 100) : 0;
 
-  const chevron = (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-         className={`text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
-      <polyline points="6 9 12 15 18 9" />
-    </svg>
-  );
+  // Subject palette
+  const SUBJ_PALETTE = {
+    math:            { from: '#7c3aed', to: '#6d28d9', light: '#f5f3ff', badge: '#ede9fe', text: '#6d28d9' },
+    reading_writing: { from: '#0891b2', to: '#0e7490', light: '#ecfeff', badge: '#cffafe', text: '#0891b2' },
+    general:         { from: '#475569', to: '#334155', light: '#f8fafc', badge: '#e2e8f0', text: '#475569' },
+  };
 
   return (
-    <div className="rounded-xl border border-gray-200 overflow-hidden">
+    <div className={`rounded-2xl border overflow-hidden transition-all duration-200 ${expanded ? 'shadow-md border-emerald-300' : 'shadow-sm hover:shadow-md border-gray-200'}`}>
+
+      {/* ── Header ── */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center justify-between px-4 py-3.5 bg-white hover:bg-gray-50 transition-colors">
-        <div className="flex items-center gap-2.5">
-          <span className="text-base">📚</span>
-          <span className="text-sm font-semibold text-gray-700">Practice Tests</span>
+        className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-emerald-50/40 transition-colors">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-sm"
+               style={{ background: 'linear-gradient(135deg,#d1fae522,#6ee7b744)', border: '1.5px solid #6ee7b755' }}>
+            📚
+          </div>
+          <div>
+            <p className="text-sm font-bold text-slate-800 leading-tight">Practice Tests</p>
+            {!loading && sessions.length > 0 && (
+              <p className="text-[11px] text-slate-400 mt-0.5">{completedCount} of {sessions.length} completed</p>
+            )}
+          </div>
           {!loading && sessions.length > 0 && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-500">
-              {completedCount}/{sessions.length}
+            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+              {completionPct}%
             </span>
           )}
         </div>
-        {chevron}
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${expanded ? 'rotate-180 bg-emerald-100' : 'bg-slate-100'}`}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+               className={expanded ? 'text-emerald-600' : 'text-slate-400'}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
       </button>
 
+      {/* ── Body ── */}
       {expanded && (
-        <div className="border-t border-gray-100">
+        <div className="border-t-2 border-emerald-100">
           {loading ? (
-            <div className="py-8 flex items-center justify-center text-gray-400 text-sm gap-2">
-              <span className="w-4 h-4 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin" />
-              Loading…
+            <div className="py-10 flex items-center justify-center gap-2.5 text-slate-400 text-sm bg-slate-50/40">
+              <span className="w-4 h-4 border-2 border-slate-200 border-t-emerald-500 rounded-full animate-spin" />
+              Loading practice history…
             </div>
           ) : !hasData ? (
-            <div className="py-8 text-center text-sm text-gray-400">No practice tests taken yet.</div>
+            <div className="py-12 flex flex-col items-center gap-2 text-slate-400 bg-slate-50/40">
+              <span className="text-3xl opacity-40">📚</span>
+              <p className="text-sm">No practice tests taken yet.</p>
+            </div>
           ) : (
-            Object.entries(groups).map(([subject, topics]) => (
-              <div key={subject}>
-                <div className="px-4 py-2 bg-teal-50 border-b border-teal-100">
-                  <span className="text-[10px] font-extrabold text-teal-600 uppercase tracking-widest">
-                    {SUBJ_LABEL[subject] || subject}
-                  </span>
-                </div>
-                {Object.entries(topics).map(([topic, subTopics]) => (
-                  <div key={topic}>
-                    <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-                      <span className="text-[11px] font-semibold text-gray-500">{topic}</span>
+            Object.entries(groups).map(([subject, topics]) => {
+              const pal = SUBJ_PALETTE[subject] || SUBJ_PALETTE.general;
+              return (
+                <div key={subject}>
+                  {/* Subject header */}
+                  <div className="px-5 py-2.5 flex items-center gap-2"
+                       style={{ background: `linear-gradient(135deg,${pal.from}18,${pal.to}28)`, borderBottom: `2px solid ${pal.from}22` }}>
+                    <div className="w-5 h-5 rounded-md flex items-center justify-center"
+                         style={{ background: pal.badge }}>
+                      <span className="text-[9px] font-black" style={{ color: pal.text }}>
+                        {subject === 'math' ? 'M' : subject === 'reading_writing' ? 'R' : 'G'}
+                      </span>
                     </div>
-                    {Object.entries(subTopics).map(([subTopic, attempts]) => (
-                      <SubTopicRow key={subTopic} subTopic={subTopic} attempts={attempts} onView={onView} viewLoadingId={viewLoadingId} />
-                    ))}
+                    <span className="text-[11px] font-extrabold uppercase tracking-[1.5px]"
+                          style={{ color: pal.text }}>
+                      {SUBJ_LABEL[subject] || subject}
+                    </span>
                   </div>
-                ))}
-              </div>
-            ))
+
+                  {Object.entries(topics).map(([topic, subTopics]) => (
+                    <div key={topic}>
+                      {/* Topic header */}
+                      <div className="px-5 py-2 flex items-center gap-2"
+                           style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', borderLeft: `3px solid ${pal.from}44` }}>
+                        <span className="text-[11px] font-bold text-slate-600">{topic}</span>
+                        <span className="text-[10px] text-slate-400">
+                          · {Object.values(subTopics).reduce((n, arr) => n + arr.length, 0)} attempts
+                        </span>
+                      </div>
+                      {Object.entries(subTopics).map(([subTopic, attempts]) => (
+                        <SubTopicRow key={subTopic} subTopic={subTopic} attempts={attempts}
+                                     onView={onView} viewLoadingId={viewLoadingId} accentColor={pal.from} />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              );
+            })
           )}
         </div>
       )}
@@ -1129,87 +1236,136 @@ function PracticeHistorySection({ sessions, loading, onView, viewLoadingId }) {
   );
 }
 
-function SubTopicRow({ subTopic, attempts, onView, viewLoadingId }) {
+function SubTopicRow({ subTopic, attempts, onView, viewLoadingId, accentColor = '#0d9488' }) {
   const [showAttempts, setShowAttempts] = useState(false);
 
-  const scores   = attempts.map(a => a.percentage ?? 0);
-  const best     = Math.max(...scores);
-  const latest   = scores[scores.length - 1] ?? 0;
-  const trend    = scores.length > 1 ? latest - scores[0] : null;
-  const dots     = scores.slice(-8);
+  const scores     = attempts.map(a => a.percentage ?? 0);
+  const best       = Math.max(...scores);
+  const latest     = scores[scores.length - 1] ?? 0;
+  const prev       = scores.length > 1 ? scores[scores.length - 2] : null;
+  const trend      = prev !== null ? latest - prev : null;
+  const bars       = scores.slice(-8);
 
-  const trendColor = trend === null ? '#9ca3af' : trend > 5 ? '#10b981' : trend < -5 ? '#ef4444' : '#f59e0b';
-  const trendLabel = trend === null ? null : `${trend > 0 ? '+' : ''}${trend}%`;
+  const trendColor = trend === null ? '#94a3b8' : trend > 0 ? '#10b981' : trend < 0 ? '#ef4444' : '#94a3b8';
+  const trendLabel = trend === null ? null : `${trend > 0 ? '+' : ''}${Math.round(trend)}%`;
 
   return (
-    <div className="border-b border-gray-50 last:border-0">
+    <div className="border-b border-slate-100 last:border-0">
+      {/* ── Summary row ── */}
       <div
-        className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-gray-50/60 cursor-pointer transition-colors"
+        className="flex items-center gap-3 px-5 py-3.5 bg-white hover:bg-slate-50/80 cursor-pointer transition-colors group"
         onClick={() => setShowAttempts(e => !e)}>
-        <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-semibold text-gray-800 truncate">{subTopic}</p>
-          <p className="text-[11px] text-gray-400">{attempts.length} attempt{attempts.length !== 1 ? 's' : ''}</p>
+
+        {/* Attempt count badge */}
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[11px] font-extrabold shrink-0"
+             style={{ background: `${accentColor}18`, color: accentColor }}>
+          {attempts.length}
         </div>
 
-        {/* Mini bar trend */}
-        <div className="flex items-end gap-[3px] h-7 shrink-0">
-          {dots.map((pct, i) => (
-            <div key={i} className="w-[10px] rounded-sm transition-all"
-                 style={{ height: `${Math.max(6, Math.round(pct * 0.26))}px`, background: pct >= 60 ? '#0d9488' : pct >= 40 ? '#f59e0b' : '#ef4444', opacity: 0.8 + i * 0.025 }} />
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-semibold text-slate-800 truncate">{subTopic}</p>
+          <p className="text-[11px] text-slate-400">{attempts.length} attempt{attempts.length !== 1 ? 's' : ''}</p>
+        </div>
+
+        {/* Mini bar chart */}
+        <div className="flex items-end gap-[3px] h-8 shrink-0" title="Score trend">
+          {bars.map((pct, i) => (
+            <div key={i} className="w-2.5 rounded-sm"
+                 style={{
+                   height: `${Math.max(5, Math.round(pct * 0.3))}px`,
+                   background: scoreColor(pct),
+                   opacity: 0.55 + (i / bars.length) * 0.45,
+                 }} />
           ))}
         </div>
 
-        {/* Score chips */}
+        {/* Score pills */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="text-right">
-            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-0.5">Latest</p>
-            <p className="text-[13px] font-extrabold leading-none" style={{ color: latest >= 60 ? '#0d9488' : '#f59e0b' }}>{latest}%</p>
+          <div className="text-center">
+            <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none mb-1">Latest</p>
+            <span className="text-[12px] font-extrabold px-2 py-0.5 rounded-lg"
+                  style={{ color: scoreColor(latest), background: scoreBg(latest) }}>
+              {latest}%
+            </span>
           </div>
-          <div className="text-right">
-            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-0.5">Best</p>
-            <p className="text-[13px] font-extrabold leading-none text-indigo-600">{best}%</p>
+          <div className="text-center">
+            <p className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none mb-1">Best</p>
+            <span className="text-[12px] font-extrabold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-600">
+              {best}%
+            </span>
           </div>
           {trendLabel && (
-            <span className="text-[11px] font-extrabold w-10 text-right" style={{ color: trendColor }}>{trendLabel}</span>
+            <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full min-w-[42px] text-center"
+                  style={{ color: trendColor, background: `${trendColor}18` }}>
+              {trendLabel}
+            </span>
           )}
         </div>
 
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-             className={`text-gray-300 transition-transform duration-150 shrink-0 ${showAttempts ? 'rotate-180' : ''}`}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
+        {/* Expand chevron */}
+        <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-150 ${showAttempts ? 'rotate-180' : ''}`}
+             style={{ background: showAttempts ? `${accentColor}18` : '#f1f5f9' }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+               style={{ color: showAttempts ? accentColor : '#94a3b8' }}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
       </div>
 
+      {/* ── Attempts list ── */}
       {showAttempts && (
-        <div className="bg-slate-50/70">
+        <div style={{ background: `${accentColor}06`, borderTop: `1px dashed ${accentColor}33` }}>
           {attempts.map((s, i) => {
-            const date = s.createdAt
+            const date   = s.createdAt
               ? new Date(s.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
               : '';
             const pct    = s.percentage ?? 0;
             const isDone = s.status === 'complete';
+
+            // Color cycle for attempt badges
+            const badgeColors = ['#6366f1','#0891b2','#0d9488','#d97706','#7c3aed','#db2777','#059669','#dc2626'];
+            const badgeColor  = badgeColors[i % badgeColors.length];
+
             return (
-              <div key={s._id} className="flex items-center gap-3 px-5 py-2.5 border-b border-gray-100 last:border-0">
-                <div className="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-500 shrink-0">
+              <div key={s._id}
+                   className="flex items-center gap-3 px-6 py-3 border-b border-dashed last:border-0 hover:bg-white/60 transition-colors"
+                   style={{ borderColor: `${accentColor}22` }}>
+                {/* Attempt number */}
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold text-white shrink-0 shadow-sm"
+                     style={{ background: `linear-gradient(135deg,${badgeColor},${badgeColor}cc)` }}>
                   {i + 1}
                 </div>
+
+                {/* Label + date */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] text-gray-500">Attempt {i + 1} · <span className="text-gray-400">{date}</span></p>
+                  <p className="text-[12px] font-semibold text-slate-700">
+                    Attempt {i + 1}
+                    <span className="text-slate-400 font-normal ml-1.5">· {date}</span>
+                  </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct >= 60 ? '#0d9488' : pct >= 40 ? '#f59e0b' : '#ef4444' }} />
+
+                {/* Progress bar + score */}
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all"
+                         style={{ width: `${pct}%`, background: `linear-gradient(90deg,${scoreColor(pct)},${scoreColor(pct)}bb)` }} />
                   </div>
-                  <span className="text-[12px] font-bold w-9 text-right" style={{ color: pct >= 60 ? '#0d9488' : '#f59e0b' }}>{pct}%</span>
+                  <span className="text-[12px] font-extrabold w-10 text-right"
+                        style={{ color: scoreColor(pct) }}>
+                    {pct}%
+                  </span>
                 </div>
+
+                {/* View button */}
                 {isDone && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); onView(s); }}
+                    onClick={e => { e.stopPropagation(); onView(s); }}
                     disabled={viewLoadingId === s._id}
-                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 disabled:opacity-60 transition-colors shrink-0">
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-white disabled:opacity-60 transition-all hover:shadow-md active:scale-95 shrink-0"
+                    style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}>
                     {viewLoadingId === s._id
-                      ? <span className="w-3 h-3 inline-block rounded-full border-2 border-teal-300 border-t-teal-700 animate-spin" />
-                      : 'View'}
+                      ? <span className="w-3 h-3 inline-block rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                      : 'View →'}
                   </button>
                 )}
               </div>
@@ -1556,8 +1712,8 @@ export default function StudentProfile() {
 
     setSatSessionsLoading(true);
     Promise.all([
-      satMentorService.getStudentSessions(id).catch(() => ({ data: [] })),
-      satMentorService.getStudentPracticeSessions(id).catch(() => ({ data: [] })),
+      satMentorService.getStudentSessions(id).catch(err => { console.error('[SAT] Failed to load adaptive sessions:', err?.message || err); return { data: [] }; }),
+      satMentorService.getStudentPracticeSessions(id).catch(err => { console.error('[SAT] Failed to load practice sessions:', err?.message || err); return { data: [] }; }),
     ]).then(([adaptiveRes, practiceRes]) => {
       setAdaptiveSessions(adaptiveRes.data || []);
       setPracticeSessions(practiceRes.data || []);
@@ -1576,7 +1732,8 @@ export default function StudentProfile() {
         const res = await satMentorService.getSessionResults(session._id);
         setAdaptiveResult({ session: res.data, assignment: { exam_config_id: session.exam_config_id } });
       }
-    } catch {
+    } catch (err) {
+      console.error('[SAT] Failed to load session results:', err?.message || err);
       if (session.session_type === 'full_length') {
         setFullLengthResult(null);
       } else {
@@ -1593,7 +1750,8 @@ export default function StudentProfile() {
     try {
       const res = await satMentorService.getPracticeResults(session._id);
       setPracticeResult({ session: res.data, config: session.practice_config_id });
-    } catch {
+    } catch (err) {
+      console.error('[SAT] Failed to load practice results:', err?.message || err);
       setPracticeResult({ session: null, config: session.practice_config_id });
     } finally {
       setPracticeResultLoading(null);
@@ -1627,8 +1785,15 @@ export default function StudentProfile() {
   const sessionsDone  = student.completedSessions || 0;
   const totalSess     = student.totalSessions || batch?.totalSessions || 0;
   const batchPct      = Math.round(((batch?.completedSessions || 0) / (batch?.totalSessions || 1)) * 100);
-  const diagnosticSessions = adaptiveSessions.filter(s => s.exam_config_id?.type === 'diagnostic');
-  const mockSessions       = adaptiveSessions.filter(s => s.exam_config_id?.type === 'mock');
+  // Sessions from full-length tests carry a synthetic exam_config_id: { type } object.
+  // Sessions from standalone tests have exam_config_id populated from DB (always has type due to schema default).
+  // Guard against null exam_config_id (e.g. config deleted after session was created).
+  const diagnosticSessions = adaptiveSessions.filter(s =>
+    s.exam_config_id?.type === 'diagnostic'
+  );
+  const mockSessions = adaptiveSessions.filter(s =>
+    s.exam_config_id?.type === 'mock' || (s.exam_config_id && !s.exam_config_id.type)
+  );
   const totalTests         = adaptiveSessions.length + practiceSessions.length;
 
   const addNote = () => {
@@ -1746,82 +1911,398 @@ export default function StudentProfile() {
         )}
 
         {/* ── Progress ── */}
-        {activeTab === 'Progress' && (
-          <div className="p-6 flex flex-col gap-5">
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-semibold text-gray-700">Overall Progress</span>
-                <span className="text-sm font-bold" style={{ color: progressColor }}>{prog}%</span>
-              </div>
-              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: `${prog}%`, background: progressColor }} />
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between mb-2">
-                <span className="text-sm font-semibold text-gray-700">Personal Sessions</span>
-                <span className="text-sm text-gray-500">{sessionsDone} / {totalSess}</span>
-              </div>
-              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-mentor-primary to-cyan-500 rounded-full transition-all"
-                     style={{ width: totalSess ? `${Math.round((sessionsDone / totalSess) * 100)}%` : '0%' }} />
-              </div>
-            </div>
-            {batch && (
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-semibold text-gray-700">Batch Progress ({batch.name})</span>
-                  <span className="text-sm text-gray-500">{batch.completedSessions || 0} / {batch.totalSessions} sessions · {batchPct}%</span>
-                </div>
-                <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full transition-all" style={{ width: `${batchPct}%` }} />
-                </div>
-              </div>
-            )}
-            <div className="grid grid-cols-3 gap-3 mt-1">
-              {[
-                { label: 'Beginner',     threshold: 30, icon: '🌱' },
-                { label: 'Intermediate', threshold: 60, icon: '🚀' },
-                { label: 'Advanced',     threshold: 90, icon: '🏆' },
-              ].map(m => (
-                <div key={m.label} className={`rounded-xl p-3 text-center border ${prog >= m.threshold ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
-                  <p className="text-xl mb-1">{m.icon}</p>
-                  <p className={`text-xs font-semibold ${prog >= m.threshold ? 'text-green-700' : 'text-gray-400'}`}>{m.label}</p>
-                  <p className="text-[10px] text-gray-400">{m.threshold}%+</p>
-                </div>
-              ))}
-            </div>
+        {activeTab === 'Progress' && (() => {
+          const sessPct = totalSess ? Math.round((sessionsDone / totalSess) * 100) : 0;
+          const statusLabel = prog >= 80 ? 'Excellent' : prog >= 50 ? 'On Track' : 'Needs Focus';
+          const statusColor = prog >= 80 ? '#10b981'   : prog >= 50 ? '#f59e0b'  : '#ef4444';
 
-            {/* SAT Test History — three expandable categories */}
-            <div className="border-t border-gray-100 pt-5 flex flex-col gap-3">
-              <p className="text-sm font-semibold text-gray-700">SAT Test History</p>
-              <SatTestSection
-                label="Diagnostic Tests"
-                icon="🔍"
-                accentColor="#f97316"
-                sessions={diagnosticSessions}
-                loading={satSessionsLoading}
-                onView={handleViewAdaptiveResult}
-                viewLoadingId={adaptiveResultLoading}
-              />
-              <SatTestSection
-                label="Mock Tests"
-                icon="📋"
-                accentColor="#4f46e5"
-                sessions={mockSessions}
-                loading={satSessionsLoading}
-                onView={handleViewAdaptiveResult}
-                viewLoadingId={adaptiveResultLoading}
-              />
-              <PracticeHistorySection
-                sessions={practiceSessions}
-                loading={satSessionsLoading}
-                onView={handleViewPracticeResult}
-                viewLoadingId={practiceResultLoading}
-              />
+          const ProgressTrack = ({ label, pct, gradient, note, icon }) => (
+            <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{icon}</span>
+                  <span className="text-[13px] font-bold text-slate-700">{label}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {note && <span className="text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{note}</span>}
+                  <span className="text-[14px] font-extrabold"
+                        style={{ background: gradient, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                    {pct}%
+                  </span>
+                </div>
+              </div>
+              <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-700"
+                     style={{ width: `${pct}%`, background: gradient }} />
+              </div>
             </div>
-          </div>
-        )}
+          );
+
+          return (
+            <div className="flex flex-col overflow-hidden">
+
+              {/* ── Hero banner ── */}
+              <div className="relative overflow-hidden px-6 py-6"
+                   style={{ background: 'linear-gradient(135deg,#1e1b4b 0%,#312e81 45%,#4c1d95 100%)' }}>
+                {/* Decorative blobs */}
+                <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none"
+                     style={{ background: 'radial-gradient(circle,rgba(167,139,250,0.25),transparent 70%)' }} />
+                <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full pointer-events-none"
+                     style={{ background: 'radial-gradient(circle,rgba(96,165,250,0.2),transparent 70%)' }} />
+
+                <div className="flex items-center gap-5 relative z-10">
+                  {/* Circular progress ring */}
+                  <div className="relative w-[76px] h-[76px] shrink-0">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 80 80">
+                      <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="7" />
+                      <circle cx="40" cy="40" r="34" fill="none" strokeWidth="7" strokeLinecap="round"
+                              stroke="url(#heroRing)"
+                              strokeDasharray={`${(2 * Math.PI * 34 * prog) / 100} ${2 * Math.PI * 34}`} />
+                      <defs>
+                        <linearGradient id="heroRing" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="#34d399" />
+                          <stop offset="100%" stopColor="#10b981" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-[17px] font-black text-white leading-none">{prog}%</span>
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-extrabold text-[15px] leading-snug">Learning Progress</p>
+                    <p className="text-indigo-300 text-[11px] mt-0.5">Overall completion across all activities</p>
+                    <div className="flex items-center gap-4 mt-3 flex-wrap">
+                      <div>
+                        <p className="text-white font-extrabold text-sm leading-tight">
+                          {sessionsDone}<span className="text-indigo-300 font-normal text-[11px]">/{totalSess}</span>
+                        </p>
+                        <p className="text-indigo-300 text-[10px]">Sessions</p>
+                      </div>
+                      {batch && (
+                        <>
+                          <div className="w-px h-7 bg-white/15" />
+                          <div>
+                            <p className="text-white font-extrabold text-sm leading-tight">{batchPct}%</p>
+                            <p className="text-indigo-300 text-[10px]">Batch</p>
+                          </div>
+                        </>
+                      )}
+                      <div className="w-px h-7 bg-white/15" />
+                      <div>
+                        <p className="text-sm font-extrabold leading-tight" style={{ color: statusColor }}>{statusLabel}</p>
+                        <p className="text-indigo-300 text-[10px]">Status</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5 flex flex-col gap-5">
+
+                {/* ── Progress tracks ── */}
+                <div className="flex flex-col gap-2.5">
+                  <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-[1.5px]">Progress Breakdown</p>
+                  <ProgressTrack label="Overall Progress" pct={prog}
+                    gradient="linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa)" icon="📈" />
+                  <ProgressTrack label="Personal Sessions" pct={sessPct}
+                    gradient="linear-gradient(90deg,#0891b2,#06b6d4,#22d3ee)"
+                    note={`${sessionsDone} / ${totalSess}`} icon="🎯" />
+                  {batch && (
+                    <ProgressTrack label={`Batch · ${batch.name}`} pct={batchPct}
+                      gradient="linear-gradient(90deg,#7c3aed,#a855f7,#c084fc)"
+                      note={`${batch.completedSessions || 0} / ${batch.totalSessions}`} icon="👥" />
+                  )}
+                </div>
+
+                {/* ── Milestones ── */}
+                {(() => {
+                  // ── Keyframe injection ──────────────────────────────────────
+                  const css = `
+                    .ms-card { transition: transform 0.35s cubic-bezier(.34,1.56,.64,1), box-shadow 0.35s ease; }
+                    .ms-card:hover { transform: translateY(-8px) scale(1.04); }
+                    .ms-card.achieved:hover { box-shadow: 0 24px 64px var(--ms-glow) !important; }
+                    .ms-card:hover .ms-icon { animation: msFloat 1.8s ease-in-out infinite; }
+                    .ms-card:hover .ms-shimmer { animation: msShimmer 0.75s ease forwards; }
+                    .ms-card.achieved .ms-ring { animation: msRingPulse 2.5s ease-in-out infinite; }
+                    .ms-card:hover .ms-orb { animation: msOrbSpin 4s linear infinite; }
+                    @keyframes msFloat {
+                      0%,100% { transform: translateY(0) rotate(0deg); }
+                      30%     { transform: translateY(-10px) rotate(-4deg); }
+                      70%     { transform: translateY(-6px) rotate(3deg); }
+                    }
+                    @keyframes msShimmer {
+                      0%   { transform: translateX(-120%) skewX(-20deg); opacity:.6; }
+                      100% { transform: translateX(220%) skewX(-20deg); opacity:0; }
+                    }
+                    @keyframes msRingPulse {
+                      0%,100% { opacity:.35; transform:scale(1); }
+                      50%     { opacity:.7;  transform:scale(1.08); }
+                    }
+                    @keyframes msOrbSpin {
+                      from { transform: rotate(0deg)   translateX(28px) rotate(0deg); }
+                      to   { transform: rotate(360deg) translateX(28px) rotate(-360deg); }
+                    }
+                    @keyframes msSparkle {
+                      0%,100% { opacity:0; transform:scale(0) rotate(0deg); }
+                      50%     { opacity:1; transform:scale(1) rotate(180deg); }
+                    }
+                    .ms-card.achieved .ms-sparkle-1 { animation: msSparkle 2s ease-in-out 0s infinite; }
+                    .ms-card.achieved .ms-sparkle-2 { animation: msSparkle 2s ease-in-out 0.6s infinite; }
+                    .ms-card.achieved .ms-sparkle-3 { animation: msSparkle 2s ease-in-out 1.2s infinite; }
+                  `;
+
+                  // ── SVG Icons ───────────────────────────────────────────────
+                  const SeedlingIcon = ({ on }) => (
+                    <svg viewBox="0 0 72 72" width="72" height="72" fill="none">
+                      <ellipse cx="36" cy="64" rx="18" ry="4" fill={on ? '#bbf7d0' : '#e2e8f0'} opacity="0.6"/>
+                      {/* Stem */}
+                      <path d="M36 64 C36 54 34 46 35 36 C35.5 30 36 26 36 22" stroke={on ? '#16a34a' : '#94a3b8'} strokeWidth="3" strokeLinecap="round"/>
+                      {/* Left leaf */}
+                      <path d="M35 48 C26 44 14 34 17 20 C26 20 35 34 35 48Z" fill={on ? '#4ade80' : '#d1d5db'}/>
+                      <path d="M17 20 C20 28 26 38 35 48" stroke={on ? '#15803d' : '#9ca3af'} strokeWidth="1.2" strokeLinecap="round"/>
+                      {/* Right leaf */}
+                      <path d="M36 42 C45 35 57 27 54 13 C45 14 37 28 36 42Z" fill={on ? '#86efac' : '#e5e7eb'}/>
+                      <path d="M54 13 C51 21 45 31 36 42" stroke={on ? '#15803d' : '#9ca3af'} strokeWidth="1.2" strokeLinecap="round"/>
+                      {/* Small centre bud */}
+                      <circle cx="36" cy="20" r="7" fill={on ? '#22c55e' : '#9ca3af'}/>
+                      <circle cx="36" cy="20" r="4.5" fill={on ? '#4ade80' : '#d1d5db'}/>
+                      <circle cx="34" cy="18" r="2" fill="white" opacity="0.55"/>
+                      {/* Soil dots */}
+                      {on && <><circle cx="24" cy="63" r="1.5" fill="#86efac" opacity="0.7"/><circle cx="47" cy="63" r="1" fill="#4ade80" opacity="0.5"/></>}
+                    </svg>
+                  );
+
+                  const RocketIcon = ({ on }) => (
+                    <svg viewBox="0 0 72 72" width="72" height="72" fill="none">
+                      {/* Outer flame */}
+                      <path d="M27 58 Q30 70 36 66 Q42 70 45 58" fill={on ? '#f97316' : '#9ca3af'}/>
+                      {/* Inner flame */}
+                      <path d="M30 58 Q33 64 36 61 Q39 64 42 58" fill={on ? '#fbbf24' : '#d1d5db'}/>
+                      {/* Rocket body */}
+                      <path d="M22 52 L22 38 Q22 16 36 8 Q50 16 50 38 L50 52 Z" fill={on ? '#6366f1' : '#94a3b8'}/>
+                      {/* Body top shade */}
+                      <path d="M22 38 Q22 16 36 8 Q50 16 50 38 L46 38 Q46 22 36 14 Q26 22 26 38 Z" fill="white" opacity="0.12"/>
+                      {/* Porthole ring */}
+                      <circle cx="36" cy="34" r="10" fill={on ? '#1d4ed8' : '#64748b'}/>
+                      {/* Porthole glass */}
+                      <circle cx="36" cy="34" r="8" fill={on ? '#bfdbfe' : '#e2e8f0'}/>
+                      <circle cx="36" cy="34" r="5.5" fill={on ? '#eff6ff' : '#f8fafc'}/>
+                      <circle cx="33.5" cy="31.5" r="2.2" fill="white" opacity="0.75"/>
+                      {/* Left fin */}
+                      <path d="M22 52 L11 62 L22 59 Z" fill={on ? '#4f46e5' : '#64748b'}/>
+                      {/* Right fin */}
+                      <path d="M50 52 L61 62 L50 59 Z" fill={on ? '#4f46e5' : '#64748b'}/>
+                      {/* Stars */}
+                      {on && <>
+                        <circle cx="10" cy="22" r="1.8" fill="#fbbf24"/>
+                        <circle cx="60" cy="18" r="1.2" fill="#a78bfa"/>
+                        <circle cx="7"  cy="38" r="1"   fill="#fbbf24"/>
+                        <circle cx="64" cy="34" r="1.5" fill="#fbbf24"/>
+                        <circle cx="15" cy="10" r="1"   fill="#a78bfa"/>
+                      </>}
+                    </svg>
+                  );
+
+                  const CrownIcon = ({ on }) => (
+                    <svg viewBox="0 0 72 72" width="72" height="72" fill="none">
+                      {/* Drop shadow */}
+                      <ellipse cx="36" cy="66" rx="22" ry="3.5" fill={on ? '#fde68a' : '#e2e8f0'} opacity="0.5"/>
+                      {/* Crown body */}
+                      <path d="M10 52 L10 40 L20 24 L36 40 L52 24 L62 40 L62 52 Z" fill={on ? '#f59e0b' : '#94a3b8'}/>
+                      {/* Crown inner highlight */}
+                      <path d="M10 40 L20 24 L36 40 L52 24 L62 40 L62 34 L52 18 L36 34 L20 18 L10 34 Z" fill="white" opacity="0.14"/>
+                      {/* Base band */}
+                      <rect x="10" y="50" width="52" height="9" rx="4.5" fill={on ? '#d97706' : '#64748b'}/>
+                      {/* Band shine */}
+                      <rect x="10" y="50" width="52" height="4" rx="2" fill="white" opacity="0.12"/>
+                      {/* Red gem */}
+                      <circle cx="22" cy="54.5" r="4.5" fill={on ? '#dc2626' : '#94a3b8'}/>
+                      <circle cx="22" cy="54.5" r="2.8" fill={on ? '#fca5a5' : '#d1d5db'}/>
+                      <circle cx="20.8" cy="53.2" r="1.1" fill="white" opacity="0.6"/>
+                      {/* Blue gem */}
+                      <circle cx="36" cy="54.5" r="4.5" fill={on ? '#2563eb' : '#94a3b8'}/>
+                      <circle cx="36" cy="54.5" r="2.8" fill={on ? '#93c5fd' : '#d1d5db'}/>
+                      <circle cx="34.8" cy="53.2" r="1.1" fill="white" opacity="0.6"/>
+                      {/* Green gem */}
+                      <circle cx="50" cy="54.5" r="4.5" fill={on ? '#059669' : '#94a3b8'}/>
+                      <circle cx="50" cy="54.5" r="2.8" fill={on ? '#6ee7b7' : '#d1d5db'}/>
+                      <circle cx="48.8" cy="53.2" r="1.1" fill="white" opacity="0.6"/>
+                      {/* Top jewel */}
+                      <circle cx="36" cy="15" r="9" fill={on ? '#f59e0b' : '#9ca3af'}/>
+                      <circle cx="36" cy="15" r="6.5" fill={on ? '#fbbf24' : '#d1d5db'}/>
+                      <circle cx="33.5" cy="12.5" r="2.5" fill="white" opacity="0.6"/>
+                      {/* Sparkle stars */}
+                      {on && <>
+                        <path d="M6 18 L7.2 13 L8.4 18 L13 19 L8.4 20 L7.2 25 L6 20 L1 19 Z" fill="#fbbf24" opacity="0.85"/>
+                        <path d="M60 12 L61 8  L62 12 L66 13 L62 14 L61 18 L60 14 L56 13 Z" fill="#fbbf24" opacity="0.7"/>
+                        <circle cx="63" cy="24" r="1.5" fill="#fbbf24" opacity="0.6"/>
+                        <circle cx="9"  cy="32" r="1.5" fill="#fbbf24" opacity="0.6"/>
+                      </>}
+                    </svg>
+                  );
+
+                  const MILESTONES = [
+                    {
+                      label: 'Beginner', sub: 'First steps taken', threshold: 30,
+                      from: '#10b981', to: '#059669', glow: 'rgba(16,185,129,0.45)',
+                      bg: 'linear-gradient(145deg,#ecfdf5,#d1fae5)',
+                      orbColor: '#6ee7b7',
+                      Icon: SeedlingIcon,
+                    },
+                    {
+                      label: 'Intermediate', sub: 'Picking up speed', threshold: 60,
+                      from: '#6366f1', to: '#4f46e5', glow: 'rgba(99,102,241,0.45)',
+                      bg: 'linear-gradient(145deg,#eef2ff,#e0e7ff)',
+                      orbColor: '#a5b4fc',
+                      Icon: RocketIcon,
+                    },
+                    {
+                      label: 'Advanced', sub: 'Mastery unlocked', threshold: 90,
+                      from: '#f59e0b', to: '#d97706', glow: 'rgba(245,158,11,0.45)',
+                      bg: 'linear-gradient(145deg,#fffbeb,#fef3c7)',
+                      orbColor: '#fde68a',
+                      Icon: CrownIcon,
+                    },
+                  ];
+
+                  return (
+                    <div>
+                      <style>{css}</style>
+                      <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-[1.5px] mb-3">Milestones</p>
+                      <div className="grid grid-cols-3 gap-4">
+                        {MILESTONES.map(m => {
+                          const achieved  = prog >= m.threshold;
+                          const fillPct   = Math.min(100, Math.round((prog / m.threshold) * 100));
+                          const remaining = Math.max(0, m.threshold - prog);
+                          return (
+                            <div
+                              key={m.label}
+                              className={`ms-card ${achieved ? 'achieved' : ''} relative rounded-3xl overflow-hidden cursor-default`}
+                              style={{
+                                '--ms-glow': m.glow,
+                                background: achieved ? m.bg : 'linear-gradient(145deg,#f8fafc,#f1f5f9)',
+                                border: achieved ? `2px solid ${m.from}60` : '2px solid #e2e8f0',
+                                boxShadow: achieved ? `0 8px 28px ${m.glow}` : '0 2px 8px rgba(0,0,0,0.06)',
+                                minHeight: '210px',
+                              }}>
+
+                              {/* Pulsing outer ring (achieved only) */}
+                              {achieved && (
+                                <div className="ms-ring absolute inset-0 rounded-3xl pointer-events-none"
+                                     style={{ border: `3px solid ${m.from}`, opacity: 0.3 }} />
+                              )}
+
+                              {/* Orbiting dot (achieved only) */}
+                              {achieved && (
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ top: '-10px' }}>
+                                  <div className="ms-orb w-3 h-3 rounded-full shadow-sm"
+                                       style={{ background: m.orbColor, filter: `drop-shadow(0 0 4px ${m.from})` }} />
+                                </div>
+                              )}
+
+                              {/* Shimmer sweep on hover */}
+                              <div className="ms-shimmer absolute inset-0 pointer-events-none"
+                                   style={{ background: `linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.55) 50%,transparent 60%)`,
+                                            transform: 'translateX(-120%) skewX(-20deg)' }} />
+
+                              {/* Sparkles (achieved only) */}
+                              {achieved && <>
+                                <div className="ms-sparkle-1 absolute top-3 left-4 text-sm pointer-events-none">✦</div>
+                                <div className="ms-sparkle-2 absolute top-4 right-5 text-xs pointer-events-none" style={{ color: m.from }}>★</div>
+                                <div className="ms-sparkle-3 absolute top-8 left-8 text-[10px] pointer-events-none" style={{ color: m.orbColor }}>✦</div>
+                              </>}
+
+                              {/* Achieved badge */}
+                              {achieved ? (
+                                <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold text-white shadow-md"
+                                     style={{ background: `linear-gradient(135deg,${m.from},${m.to})` }}>
+                                  ✓ Done
+                                </div>
+                              ) : (
+                                <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-400 text-xs">
+                                  🔒
+                                </div>
+                              )}
+
+                              {/* Icon */}
+                              <div className="ms-icon flex items-center justify-center pt-7 pb-2"
+                                   style={{ filter: achieved ? 'none' : 'grayscale(0.65) opacity(0.45)' }}>
+                                <m.Icon on={achieved} />
+                              </div>
+
+                              {/* Label */}
+                              <div className="px-4 pb-5 text-center">
+                                <p className="text-[14px] font-extrabold leading-tight"
+                                   style={{ color: achieved ? m.from : '#94a3b8' }}>{m.label}</p>
+                                <p className="text-[10px] font-semibold mt-0.5"
+                                   style={{ color: achieved ? m.to : '#cbd5e1' }}>{m.sub}</p>
+
+                                {/* Progress bar toward this milestone */}
+                                <div className="mt-3 h-1.5 rounded-full overflow-hidden bg-black/10">
+                                  <div className="h-full rounded-full transition-all duration-700"
+                                       style={{ width: `${fillPct}%`, background: achieved ? `linear-gradient(90deg,${m.from},${m.to})` : '#d1d5db' }} />
+                                </div>
+
+                                {!achieved ? (
+                                  <p className="mt-1.5 text-[10px] font-bold text-slate-400">{remaining}% to go</p>
+                                ) : (
+                                  <p className="mt-1.5 text-[10px] font-bold" style={{ color: m.from }}>{m.threshold}%+ reached 🎉</p>
+                                )}
+                              </div>
+
+                              {/* Bottom colour strip */}
+                              <div className="absolute bottom-0 left-0 right-0 h-1 rounded-b-3xl"
+                                   style={{ background: achieved ? `linear-gradient(90deg,${m.from},${m.to})` : '#e2e8f0' }} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* ── SAT Test History ── */}
+                <div className="flex flex-col gap-3 pt-1">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom,#6366f1,#a855f7)' }} />
+                      <p className="text-[13px] font-extrabold text-slate-800 tracking-tight">SAT Test History</p>
+                    </div>
+                    <div className="flex-1 h-px bg-gradient-to-r from-indigo-100 to-transparent" />
+                  </div>
+                  <SatTestSection
+                    label="Diagnostic Tests"
+                    icon="🔍"
+                    accentColor="#f97316"
+                    sessions={diagnosticSessions}
+                    loading={satSessionsLoading}
+                    onView={handleViewAdaptiveResult}
+                    viewLoadingId={adaptiveResultLoading}
+                  />
+                  <SatTestSection
+                    label="Mock Tests"
+                    icon="📋"
+                    accentColor="#4f46e5"
+                    sessions={mockSessions}
+                    loading={satSessionsLoading}
+                    onView={handleViewAdaptiveResult}
+                    viewLoadingId={adaptiveResultLoading}
+                  />
+                  <PracticeHistorySection
+                    sessions={practiceSessions}
+                    loading={satSessionsLoading}
+                    onView={handleViewPracticeResult}
+                    viewLoadingId={practiceResultLoading}
+                  />
+                </div>
+
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── Notes ── */}
         {activeTab === 'Notes' && (

@@ -12,7 +12,7 @@ const STATUS_STYLE = {
 
 /* ── Create Batch Modal ─────────────────────────────────────── */
 function CreateBatchModal({ mentors, students, onSave, onClose }) {
-  const [form, setForm]     = useState({ name: '', subject: '', mentorId: '', studentId: '', startDate: '', endDate: '', totalSessions: 60 });
+  const [form, setForm]     = useState({ name: '', subject: '', mentorId: '', studentId: '', startDate: '', totalSessions: 60 });
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
@@ -26,7 +26,6 @@ function CreateBatchModal({ mentors, students, onSave, onClose }) {
         ...form,
         totalSessions: Number(form.totalSessions),
         startDate: form.startDate || undefined,
-        endDate:   form.endDate   || undefined,
       });
       onSave(res.data);
     } catch (err) {
@@ -76,15 +75,9 @@ function CreateBatchModal({ mentors, students, onSave, onClose }) {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-gray-700">Start Date</label>
-              <input className={inputClass} type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-gray-700">End Date</label>
-              <input className={inputClass} type="date" value={form.endDate} onChange={e => set('endDate', e.target.value)} />
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-gray-700">Start Date</label>
+            <input className={inputClass} type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} />
           </div>
 
           <div className="flex flex-col gap-1.5">

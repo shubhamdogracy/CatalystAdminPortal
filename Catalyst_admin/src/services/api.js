@@ -76,6 +76,9 @@ export const satAdminService = {
   getExamConfigById:(id)           => req(`/sat/admin/exam-configs/${id}`),
   createExamConfig: (payload)      => req('/sat/admin/exam-configs', { method: 'POST', body: JSON.stringify(payload) }),
   updateExamConfig: (id, payload)  => req(`/sat/admin/exam-configs/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteExamConfig: (id)           => req(`/sat/admin/exam-configs/${id}`, { method: 'DELETE' }),
+  patchPairDemoAccess: (mathConfigId, rwConfigId, is_demo_accessible) =>
+    req('/sat/admin/exam-configs/pair-demo-access', { method: 'PATCH', body: JSON.stringify({ mathConfigId, rwConfigId, is_demo_accessible }) }),
   // Full length configs
   getFullLengthConfigs:   ()              => req('/sat/admin/full-length-configs'),
   createFullLengthConfig: (payload)       => req('/sat/admin/full-length-configs', { method: 'POST', body: JSON.stringify(payload) }),
@@ -83,7 +86,8 @@ export const satAdminService = {
   // Practice test configs
   getPracticeConfigs:   (params = {})  => { const qs = new URLSearchParams(params).toString(); return req(`/sat/admin/practice-configs${qs ? `?${qs}` : ''}`); },
   createPracticeConfig: (payload)      => req('/sat/admin/practice-configs', { method: 'POST', body: JSON.stringify(payload) }),
-  updatePracticeConfig: (id, payload)  => req(`/sat/admin/practice-configs/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  updatePracticeConfig:  (id, payload)  => req(`/sat/admin/practice-configs/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deletePracticeConfig:  (id)           => req(`/sat/admin/practice-configs/${id}`, { method: 'DELETE' }),
 };
 
 export const satMentorService = {

@@ -146,12 +146,15 @@ export function SubjectSection({ title, borderCls, headerCls, value, onChange })
 export function CreateSubjectModal({ onClose, onSaved, existing, defaultType, lockedType }) {
   const isEdit = !!existing;
 
-  const [name,    setName]    = useState(isEdit ? existing.name : '');
-  const [type,    setType]    = useState(lockedType || existing?.type || defaultType || 'mock');
-  const [rwCfg,   setRwCfg]   = useState(isEdit && existing.subject === 'reading_writing' ? cfgFromExisting(existing) : emptySubjectCfg());
-  const [mathCfg, setMathCfg] = useState(isEdit && existing.subject === 'math'            ? cfgFromExisting(existing) : emptySubjectCfg());
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState('');
+  const [name,              setName]             = useState(isEdit ? existing.name : '');
+  const [type,              setType]             = useState(lockedType || existing?.type || defaultType || 'mock');
+  const [rwCfg,             setRwCfg]            = useState(isEdit && existing.subject === 'reading_writing' ? cfgFromExisting(existing) : emptySubjectCfg());
+  const [mathCfg,           setMathCfg]          = useState(isEdit && existing.subject === 'math'            ? cfgFromExisting(existing) : emptySubjectCfg());
+  const [isDemoAccessible,  setIsDemoAccessible] = useState(existing?.is_demo_accessible || false);
+  const [loading,           setLoading]          = useState(false);
+  const [deleting,          setDeleting]         = useState(false);
+  const [confirmDel,        setConfirmDel]       = useState(false);
+  const [error,             setError]            = useState('');
 
   const buildPayload = (subjectName, subject, cfg) => {
     const total  = Number(cfg.m1.total_questions);
@@ -161,6 +164,7 @@ export function CreateSubjectModal({ onClose, onSaved, existing, defaultType, lo
     const m2bDiff = toDiff(cfg.m2b.difficulty);
     return {
       name: subjectName, subject, type,
+      is_demo_accessible: isDemoAccessible,
       adaptive_threshold: Number(cfg.threshold),
       module_1: { total_questions: total, time_limit_minutes: Number(cfg.m1.time_limit_minutes), difficulty_distribution: toDiff(cfg.m1.difficulty_distribution) },
       module_2_easy:   { total_questions: total, time_limit_minutes: Number(cfg.m2a.time_limit_minutes), difficulty_distribution: m2aDiff },
@@ -183,6 +187,15 @@ export function CreateSubjectModal({ onClose, onSaved, existing, defaultType, lo
     if (!Number(cfg.m2b.time_limit_minutes)) return `${label}: Module 2b time required.`;
     if (diffSum(cfg.m2b.difficulty) !== total) return `${label}: Module 2b distribution must equal ${total}Q.`;
     return null;
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true); setError('');
+    try {
+      await satAdminService.deleteExamConfig(existing._id);
+      onSaved(); onClose();
+    } catch (e) { setError(e.message); }
+    finally { setDeleting(false); }
   };
 
   const handleSave = async () => {
@@ -274,14 +287,40 @@ export function CreateSubjectModal({ onClose, onSaved, existing, defaultType, lo
             </div>
           )}
         </div>
+        <div className="px-6 py-3 border-t border-gray-100 shrink-0">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={isDemoAccessible}
+              onChange={e => setIsDemoAccessible(e.target.checked)}
+              className="w-4 h-4 rounded accent-ops-primary" />
+            <span className="text-sm text-gray-700">Accessible to demo/guest users</span>
+          </label>
+        </div>
         <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-3" style={{ flexShrink: 0 }}>
           {error && <p className="text-sm text-red-500 bg-red-50 rounded-[10px] px-3 py-2">{error}</p>}
-          <div className="flex justify-end gap-3">
-            <button onClick={onClose} className="px-4 py-2 rounded-[10px] border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-            <button onClick={handleSave} disabled={loading}
-              className="px-5 py-2 rounded-[10px] bg-ops-primary text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors">
-              {loading ? 'Saving…' : isEdit ? 'Save Changes' : `Create ${typeLabel} Tests`}
-            </button>
+          {confirmDel && (
+            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-[10px] px-3 py-2.5">
+              <span className="text-sm text-red-700 flex-1">Delete this config permanently?</span>
+              <button onClick={() => setConfirmDel(false)} className="text-xs px-3 py-1.5 rounded-[8px] border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="text-xs px-3 py-1.5 rounded-[8px] bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50">
+                {deleting ? 'Deleting…' : 'Yes, Delete'}
+              </button>
+            </div>
+          )}
+          <div className="flex justify-between gap-3">
+            {isEdit ? (
+              <button onClick={() => setConfirmDel(true)} disabled={confirmDel}
+                className="px-4 py-2 rounded-[10px] border border-red-200 text-sm text-red-600 hover:bg-red-50 disabled:opacity-40">
+                Delete
+              </button>
+            ) : <span />}
+            <div className="flex gap-3">
+              <button onClick={onClose} className="px-4 py-2 rounded-[10px] border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button onClick={handleSave} disabled={loading}
+                className="px-5 py-2 rounded-[10px] bg-ops-primary text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors">
+                {loading ? 'Saving…' : isEdit ? 'Save Changes' : `Create ${typeLabel} Tests`}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -294,6 +333,9 @@ export function CreatePracticeModal({ onClose, onSaved, existing }) {
   const initSubject  = existing?.subject   || 'math';
   const initTopic    = existing?.topic     || '';
   const initSubTopic = existing?.sub_topic || '';
+
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [deleting,   setDeleting]   = useState(false);
 
   const [form, setForm] = useState({
     name:               existing?.name    || '',
@@ -327,6 +369,15 @@ export function CreatePracticeModal({ onClose, onSaved, existing }) {
     if (!form.sub_topic)     return 'Sub-topic is required.';
     if (totalSet !== Number(form.total_questions)) return `Difficulty distribution (${totalSet}) must equal total questions (${form.total_questions}).`;
     return null;
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await satAdminService.deletePracticeConfig(existing._id);
+      onSaved(); onClose();
+    } catch (e) { setError(e.message); }
+    finally { setDeleting(false); }
   };
 
   const handleSave = async () => {
@@ -440,12 +491,32 @@ export function CreatePracticeModal({ onClose, onSaved, existing }) {
           </label>
           {error && <p className="text-sm text-red-500 bg-red-50 rounded-[10px] px-3 py-2">{error}</p>}
         </div>
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3" style={{ flexShrink: 0 }}>
-          <button onClick={onClose} className="px-4 py-2 rounded-[10px] border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button onClick={handleSave} disabled={loading}
-            className="px-5 py-2 rounded-[10px] bg-ops-primary text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors">
-            {loading ? 'Saving…' : existing ? 'Save Changes' : 'Create'}
-          </button>
+        <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-3" style={{ flexShrink: 0 }}>
+          {confirmDel && (
+            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-[10px] px-3 py-2.5">
+              <span className="text-sm text-red-700 flex-1">Delete this practice test permanently?</span>
+              <button onClick={() => setConfirmDel(false)} className="text-xs px-3 py-1.5 rounded-[8px] border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="text-xs px-3 py-1.5 rounded-[8px] bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50">
+                {deleting ? 'Deleting…' : 'Yes, Delete'}
+              </button>
+            </div>
+          )}
+          <div className="flex justify-between gap-3">
+            {existing ? (
+              <button onClick={() => setConfirmDel(true)} disabled={confirmDel}
+                className="px-4 py-2 rounded-[10px] border border-red-200 text-sm text-red-600 hover:bg-red-50 disabled:opacity-40">
+                Delete
+              </button>
+            ) : <span />}
+            <div className="flex gap-3">
+              <button onClick={onClose} className="px-4 py-2 rounded-[10px] border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+              <button onClick={handleSave} disabled={loading}
+                className="px-5 py-2 rounded-[10px] bg-ops-primary text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors">
+                {loading ? 'Saving…' : existing ? 'Save Changes' : 'Create'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -515,71 +586,86 @@ export function SubjectConfigCard({ config, onEdit }) {
   );
 }
 
-// ── Diagnostic pair card (Math + R&W grouped as one test) ────────────────────
-function SubjectMiniPanel({ label, config, onEdit, borderCls, headerCls }) {
-  if (!config) return (
-    <div className={`border-2 ${borderCls} rounded-[12px] overflow-hidden`}>
-      <div className={`px-3 py-2 ${headerCls}`}>
-        <p className="text-xs font-bold uppercase tracking-wider">{label}</p>
-      </div>
-      <div className="p-3 text-xs text-gray-400 italic">Not configured</div>
-    </div>
-  );
-  const m1 = config.module_1; const m2a = config.module_2_easy; const m2b = config.module_2_hard;
-  return (
-    <div className={`border-2 ${borderCls} rounded-[12px] overflow-hidden flex flex-col`}>
-      <div className={`px-3 py-2 ${headerCls} flex items-center justify-between`}>
-        <p className="text-xs font-bold uppercase tracking-wider">{label}</p>
-        <button onClick={() => onEdit(config)}
-          className="text-[10px] px-2 py-0.5 rounded bg-white/60 hover:bg-white text-gray-600 font-medium">
-          Edit
-        </button>
-      </div>
-      <div className="p-3 flex flex-col gap-2">
-        <div className="grid grid-cols-3 gap-1">
-          <div className="rounded-[8px] border border-gray-200 p-2 flex flex-col gap-0.5">
-            <p className="text-[9px] font-bold text-gray-500 uppercase">M1</p>
-            <p className="text-[11px] text-gray-700 font-semibold">{m1?.total_questions}Q</p>
-            <p className="text-[10px] text-gray-400">{m1?.time_limit_minutes}min</p>
-          </div>
-          <div className="rounded-[8px] border border-green-200 bg-green-50/40 p-2 flex flex-col gap-0.5">
-            <p className="text-[9px] font-bold text-green-600 uppercase">2a</p>
-            <p className="text-[11px] text-gray-700 font-semibold">{m2a?.total_questions}Q</p>
-            <p className="text-[10px] text-gray-400">{m2a?.time_limit_minutes}min</p>
-          </div>
-          <div className="rounded-[8px] border border-red-200 bg-red-50/40 p-2 flex flex-col gap-0.5">
-            <p className="text-[9px] font-bold text-red-600 uppercase">2b</p>
-            <p className="text-[11px] text-gray-700 font-semibold">{m2b?.total_questions}Q</p>
-            <p className="text-[10px] text-gray-400">{m2b?.time_limit_minutes}min</p>
-          </div>
-        </div>
-        {config.adaptive_threshold != null && (
-          <p className="text-[10px] text-gray-400">Threshold: {config.adaptive_threshold}%</p>
-        )}
-      </div>
-    </div>
-  );
-}
+// ── Diagnostic / Mock pair card (grouped as one test entity) ─────────────────
+export function DiagnosticPairCard({ seriesName, mathConfig, rwConfig, onEdit, onToggleDemo, type = 'diagnostic' }) {
+  const [toggling, setToggling] = useState(false);
 
-export function DiagnosticPairCard({ seriesName, mathConfig, rwConfig, onEdit, type = 'diagnostic' }) {
   const typeLabel = type === 'diagnostic' ? 'Diagnostic' : 'Mock';
   const typeBadge = type === 'diagnostic' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700';
+  const m1Q = mathConfig?.module_1?.total_questions;
+  const rwQ = rwConfig?.module_1?.total_questions;
+  const threshold = mathConfig?.adaptive_threshold ?? rwConfig?.adaptive_threshold;
+
+  // True only when ALL present configs are marked accessible (consistent with student portal)
+  const presentConfigs = [mathConfig, rwConfig].filter(Boolean);
+  const isDemoAccessible = presentConfigs.length > 0 && presentConfigs.every(c => c.is_demo_accessible);
+
+  const handleToggle = async () => {
+    if (!onToggleDemo || toggling) return;
+    setToggling(true);
+    try { await onToggleDemo(!isDemoAccessible); }
+    finally { setToggling(false); }
+  };
+
   return (
-    <div className="bg-white rounded-[14px] border border-gray-200 p-5 flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
+    <div className={`bg-white rounded-[14px] border p-5 flex flex-col gap-3 transition-colors ${isDemoAccessible ? 'border-amber-200' : 'border-gray-200'}`}>
+      <div className="flex items-start justify-between gap-2">
         <div>
           <h3 className="font-semibold text-gray-900 text-sm">{seriesName}</h3>
-          <div className="flex items-center gap-2 mt-1.5">
+          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${typeBadge}`}>{typeLabel}</span>
-            <span className="text-[10px] text-gray-400">2 subjects · Adaptive format</span>
+            <span className="text-[10px] text-gray-400">Adaptive · 2 subjects</span>
+            {threshold != null && (
+              <span className="text-[10px] text-gray-400">threshold {threshold}%</span>
+            )}
           </div>
         </div>
+
+        {/* Guest-access toggle */}
+        {onToggleDemo && (
+          <button
+            onClick={handleToggle}
+            disabled={toggling}
+            title={isDemoAccessible ? 'Disable guest access' : 'Enable guest access'}
+            className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all
+              ${isDemoAccessible
+                ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+                : 'bg-gray-50 border-gray-200 text-gray-400 hover:bg-gray-100'
+              } ${toggling ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            {/* Toggle pill */}
+            <span className={`relative inline-flex w-7 h-4 rounded-full transition-colors ${isDemoAccessible ? 'bg-amber-400' : 'bg-gray-300'}`}>
+              <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${isDemoAccessible ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+            </span>
+            Guest Access
+          </button>
+        )}
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <SubjectMiniPanel label="Reading & Writing" config={rwConfig} onEdit={onEdit}
-          borderCls="border-blue-200" headerCls="bg-blue-50 text-blue-700" />
-        <SubjectMiniPanel label="Math" config={mathConfig} onEdit={onEdit}
-          borderCls="border-purple-200" headerCls="bg-purple-50 text-purple-700" />
+
+      <div className="rounded-[10px] border border-gray-100 bg-gray-50 px-4 py-3 flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">R&amp;W</span>
+          <span className="text-[12px] text-gray-600 font-medium">{rwQ ? `${rwQ}Q / module` : 'Not configured'}</span>
+        </div>
+        <span className="text-gray-300">|</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Math</span>
+          <span className="text-[12px] text-gray-600 font-medium">{m1Q ? `${m1Q}Q / module` : 'Not configured'}</span>
+        </div>
+        <div className="ml-auto flex gap-2">
+          {rwConfig && (
+            <button onClick={() => onEdit(rwConfig)}
+              className="text-[11px] px-2.5 py-1 rounded-[7px] border border-blue-200 text-blue-600 bg-white hover:bg-blue-50 font-medium">
+              Edit R&amp;W
+            </button>
+          )}
+          {mathConfig && (
+            <button onClick={() => onEdit(mathConfig)}
+              className="text-[11px] px-2.5 py-1 rounded-[7px] border border-purple-200 text-purple-600 bg-white hover:bg-purple-50 font-medium">
+              Edit Math
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

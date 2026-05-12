@@ -32,12 +32,14 @@ const NAV_SECTIONS = [
   {
     label: 'MY MODULES',
     items: [
-      { key: 'students',      label: 'My Students',  path: '/mentor/students',      icon: icons.students,      color: '#10b981' },
-      { key: 'slots',         label: 'Slots',         path: '/mentor/slots',         icon: icons.slots,         color: '#0d9488' },
-      { key: 'sessions',      label: 'Sessions',      path: '/mentor/sessions',      icon: icons.sessions,      color: '#0891b2' },
-      { key: 'analytics',     label: 'Analytics',     path: '/mentor/analytics',     icon: icons.analytics,     color: '#7c3aed' },
-      { key: 'sat-tests',     label: 'SAT Tests',     path: '/mentor/sat-tests',     icon: icons.sat,           color: '#f97316' },
-      { key: 'communication', label: 'Communication', path: '/mentor/communication', icon: icons.communication, color: '#ec4899' },
+      { key: 'students',  label: 'My Students', path: '/mentor/students',  icon: icons.students,  color: '#10b981' },
+      { key: 'analytics', label: 'Analytics',   path: '/mentor/analytics', icon: icons.analytics, color: '#7c3aed' },
+    ],
+  },
+  {
+    label: 'COMMUNICATION',
+    items: [
+      { key: 'communication', label: 'Chat', path: '/mentor/communication', icon: icons.communication, color: '#ec4899' },
     ],
   },
   {

@@ -5,8 +5,7 @@ import { mentorService } from '../../../services/api';
 const backIcon = <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>;
 
 const SPECIALIZATIONS = [
-  'Full Stack Development', 'Data Science & ML', 'UI/UX Design',
-  'DevOps & Cloud', 'Mobile Development', 'Cybersecurity', 'Blockchain',
+  'Maths', 'English'
 ];
 
 const inputClass = 'w-full px-3.5 py-2.5 rounded-[10px] border-[1.5px] border-gray-200 text-[13px] text-gray-900 outline-none bg-white focus:border-ops-primary transition-colors';
