@@ -27,7 +27,9 @@
       "Bash(curl -s \"http://localhost:8000/api/sat/mentor/student/test/practice-sessions\")",
       "Bash(curl -s \"http://localhost:8000/api/sat/mentor/sessions/test/results\")",
       "Bash(curl -s \"http://localhost:8000/api/sat/mentor/practice-sessions/test/results\")",
-      "Bash(xargs grep -l \"history\")"
+      "Bash(xargs grep -l \"history\")",
+      "Bash(git submodule *)",
+      "Bash(npx eslint *)"
     ]
   }
 }
