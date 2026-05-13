@@ -6,7 +6,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
-import ProtectedRoute from './components/common/ProtectedRoute';
+import ProtectedRoute   from './components/common/ProtectedRoute';
+import PublicOnlyRoute  from './components/common/PublicOnlyRoute';
+import NotFound         from './components/common/NotFound';
 
 // ── Auth ────────────────────────────────────────────────────
 import LoginPage from './components/auth/LoginPage';
@@ -46,10 +48,10 @@ export default function App() {
     return (
         <DataProvider>
             <AuthProvider>
-                <BrowserRouter basename={import.meta.env.BASE_URL}>
+                <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
                     <Routes>
-                        {/* ── Public: Login ── */}
-                        <Route path="/" element={<LoginPage />} />
+                        {/* ── Public: Login — redirect to dashboard if already authenticated ── */}
+                        <Route path="/" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
 
                         {/* ── Mentor routes (role guard) ── */}
                         <Route
@@ -100,8 +102,8 @@ export default function App() {
                             <Route path="notifications"            element={<OpsNotificationsPage />} />
                         </Route>
 
-                        {/* ── Catch-all ── */}
-                        <Route path="*" element={<Navigate to="/" replace />} />
+                        {/* ── 404 ── */}
+                        <Route path="*" element={<NotFound />} />
                     </Routes>
                 </BrowserRouter>
             </AuthProvider>
