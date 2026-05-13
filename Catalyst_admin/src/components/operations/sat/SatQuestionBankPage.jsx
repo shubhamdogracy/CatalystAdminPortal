@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { satAdminService } from '../../../services/api';
 import MathContent from '../../common/MathContent';
+import { SAT_TAXONOMY } from './examConfigConstants';
 
 const DIFF_STYLE = {
   easy:   'bg-green-100 text-green-700',
@@ -215,8 +216,11 @@ export default function SatQuestionBankPage() {
   const [showUpload, setShowUpload] = useState(false);
   const [selected, setSelected]     = useState(null);
 
-  const [filters, setFilters] = useState({ subject: '', difficulty: '', sub_topic: '' });
+  const [filters, setFilters] = useState({ subject: '', topic: '', sub_topic: '', question_id: '' });
   const LIMIT = 20;
+
+  const topicOptions    = filters.subject ? Object.keys(SAT_TAXONOMY[filters.subject] || {}) : [];
+  const subTopicOptions = filters.subject && filters.topic ? (SAT_TAXONOMY[filters.subject]?.[filters.topic] || []) : [];
 
   const loadStats = useCallback(async () => {
     try { const r = await satAdminService.getStats(); setStats(r.data); } catch {
@@ -228,9 +232,10 @@ export default function SatQuestionBankPage() {
     setLoading(true);
     try {
       const params = { page, limit: LIMIT };
-      if (filters.subject)   params.subject   = filters.subject;
-      if (filters.difficulty) params.difficulty = filters.difficulty;
-      if (filters.sub_topic) params.sub_topic  = filters.sub_topic;
+      if (filters.subject)     params.subject     = filters.subject;
+      if (filters.topic)       params.topic       = filters.topic;
+      if (filters.sub_topic)   params.sub_topic   = filters.sub_topic;
+      if (filters.question_id) params.question_id = filters.question_id;
       const r = await satAdminService.getQuestions(params);
       setQuestions(r.data);
       setTotal(r.total);
@@ -244,9 +249,10 @@ export default function SatQuestionBankPage() {
   useEffect(() => { loadStats(); }, [loadStats]);
   useEffect(() => { loadQuestions(); }, [loadQuestions]);
 
+
   const handleDeactivate = async (id) => {
-    if (!confirm('Deactivate this question? It will no longer appear in tests.')) return;
-    await satAdminService.deleteQuestion(id);
+    if (!confirm('Mark this question as unverified?')) return;
+    await satAdminService.updateQuestion(id, { review_status: 'unverified' });
     loadQuestions();
     loadStats();
   };
@@ -307,23 +313,53 @@ export default function SatQuestionBankPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-[14px] border border-gray-200 p-4 flex flex-wrap gap-3 items-center">
-        <select className={inputCls} value={filters.subject} onChange={e => { setFilters(f => ({ ...f, subject: e.target.value })); setPage(1); }}>
+        {/* Subject */}
+        <select
+          className={inputCls}
+          value={filters.subject}
+          onChange={e => {
+            setFilters(f => ({ ...f, subject: e.target.value, topic: '', sub_topic: '' }));
+            setPage(1);
+          }}
+        >
           <option value="">All Subjects</option>
           <option value="math">Math</option>
           <option value="reading_writing">Reading &amp; Writing</option>
         </select>
-        <select className={inputCls} value={filters.difficulty} onChange={e => { setFilters(f => ({ ...f, difficulty: e.target.value })); setPage(1); }}>
-          <option value="">All Difficulties</option>
-          <option value="easy">Easy</option>
-          <option value="medium">Medium</option>
-          <option value="hard">Hard</option>
+
+        {/* Topic — enabled only when subject is selected */}
+        <select
+          className={inputCls}
+          value={filters.topic}
+          disabled={!filters.subject}
+          onChange={e => {
+            setFilters(f => ({ ...f, topic: e.target.value, sub_topic: '' }));
+            setPage(1);
+          }}
+        >
+          <option value="">All Topics</option>
+          {topicOptions.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
-        <input
-          className={`${inputCls} w-52`}
-          placeholder="Filter by sub-topic…"
+
+        {/* Sub-topic — enabled only when topic is selected */}
+        <select
+          className={inputCls}
           value={filters.sub_topic}
+          disabled={!filters.topic}
           onChange={e => { setFilters(f => ({ ...f, sub_topic: e.target.value })); setPage(1); }}
+        >
+          <option value="">All Sub-topics</option>
+          {subTopicOptions.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+
+        {/* Search by Question ID */}
+        <input
+          className={`${inputCls} w-48`}
+          placeholder="Search by Question ID…"
+          value={filters.question_id}
+          onChange={e => { setFilters(f => ({ ...f, question_id: e.target.value })); setPage(1); }}
         />
+
         <span className="ml-auto text-sm text-gray-400">{total} question{total !== 1 ? 's' : ''}</span>
       </div>
 
@@ -343,7 +379,7 @@ export default function SatQuestionBankPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {['Question', 'Subject', 'Difficulty', 'Sub Topic', 'Topic', ''].map(h => (
+                {['Question', 'Subject', 'Difficulty', 'Topic', 'Sub Topic', ''].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -367,8 +403,8 @@ export default function SatQuestionBankPage() {
                   <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <Badge label={q.difficulty} cls={DIFF_STYLE[q.difficulty] || 'bg-gray-100 text-gray-600'} />
                   </td>
-                  <td className="px-4 py-3 text-gray-600 text-xs">{q.sub_topic}</td>
                   <td className="px-4 py-3 text-gray-600 text-xs">{q.topic}</td>
+                  <td className="px-4 py-3 text-gray-600 text-xs">{q.sub_topic}</td>
                   <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                     <button
                       onClick={() => handleDeactivate(q._id)}
@@ -385,11 +421,66 @@ export default function SatQuestionBankPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
-            <span className="text-xs text-gray-400">Page {page} of {totalPages}</span>
-            <div className="flex gap-2">
-              <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 rounded-[8px] border border-gray-200 text-xs disabled:opacity-40 hover:bg-gray-50">← Prev</button>
-              <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 rounded-[8px] border border-gray-200 text-xs disabled:opacity-40 hover:bg-gray-50">Next →</button>
+          <div className="px-4 py-3 border-t border-gray-100 flex flex-wrap items-center gap-2">
+            {/* Prev */}
+            <button
+              disabled={page === 1}
+              onClick={() => setPage(p => p - 1)}
+              className="px-3 py-1.5 rounded-[8px] border border-gray-200 text-xs disabled:opacity-40 hover:bg-gray-50"
+            >← Prev</button>
+
+            {/* Numbered pages */}
+            {(() => {
+              const pages = [];
+              const near = new Set(
+                [1, 2, page - 1, page, page + 1, totalPages - 1, totalPages].filter(p => p >= 1 && p <= totalPages)
+              );
+              const sorted = [...near].sort((a, b) => a - b);
+              let prev = null;
+              for (const p of sorted) {
+                if (prev !== null && p - prev > 1) pages.push('...');
+                pages.push(p);
+                prev = p;
+              }
+              return pages.map((p, i) =>
+                p === '...'
+                  ? <span key={`ellipsis-${i}`} className="px-1 text-xs text-gray-400">…</span>
+                  : <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`min-w-[32px] px-2 py-1.5 rounded-[8px] border text-xs transition-colors
+                        ${p === page
+                          ? 'bg-ops-primary text-white border-ops-primary font-semibold'
+                          : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}
+                    >{p}</button>
+              );
+            })()}
+
+            {/* Next */}
+            <button
+              disabled={page === totalPages}
+              onClick={() => setPage(p => p + 1)}
+              className="px-3 py-1.5 rounded-[8px] border border-gray-200 text-xs disabled:opacity-40 hover:bg-gray-50"
+            >Next →</button>
+
+            {/* Go to page */}
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-xs text-gray-400">Go to page</span>
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                defaultValue={page}
+                key={page}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const v = Math.min(Math.max(1, Number(e.target.value)), totalPages);
+                    setPage(v);
+                  }
+                }}
+                className="w-14 h-7 px-2 rounded-[8px] border border-gray-200 text-xs text-center focus:outline-none focus:border-ops-primary"
+              />
+              <span className="text-xs text-gray-400">of {totalPages}</span>
             </div>
           </div>
         )}
