@@ -3,11 +3,11 @@
 // ============================================================
 
 import { useState } from 'react';
-import { satAdminService } from '../../../services/api';
+import { satAdminService, satTestConfigService } from '../../../services/api';
 import {
   inputCls, labelCls, numCls,
   SUBJ_STYLE, SUBJ_LABEL, TYPE_STYLE, SAT_TAXONOMY,
-  diffSum, emptySubjectCfg, cfgFromExisting,
+  diffSum, emptySubjectCfg, cfgFromSubject,
 } from './examConfigConstants';
 
 // ── Module 1 Config ───────────────────────────────────────────────────────────
@@ -142,34 +142,34 @@ export function SubjectSection({ title, borderCls, headerCls, value, onChange })
 }
 
 // ── Create / Edit Diagnostic or Mock Config Modal ─────────────────────────────
-// `lockedType` — when provided, the type selector is replaced with a read-only display
-export function CreateSubjectModal({ onClose, onSaved, existing, defaultType, lockedType }) {
+// existing       — full unified SatTestConfig doc (null when creating)
+// defaultSubject — 'rw' | 'math'  which tab opens first in edit mode
+// lockedType     — when set, type selector is replaced with a read-only label
+export function CreateSubjectModal({ onClose, onSaved, existing, defaultSubject, defaultType, lockedType }) {
   const isEdit = !!existing;
 
-  const [name,              setName]             = useState(isEdit ? existing.name : '');
-  const [type,              setType]             = useState(lockedType || existing?.type || defaultType || 'mock');
-  const [rwCfg,             setRwCfg]            = useState(isEdit && existing.subject === 'reading_writing' ? cfgFromExisting(existing) : emptySubjectCfg());
-  const [mathCfg,           setMathCfg]          = useState(isEdit && existing.subject === 'math'            ? cfgFromExisting(existing) : emptySubjectCfg());
-  const [isDemoAccessible,  setIsDemoAccessible] = useState(existing?.is_demo_accessible || false);
-  const [loading,           setLoading]          = useState(false);
-  const [deleting,          setDeleting]         = useState(false);
-  const [confirmDel,        setConfirmDel]       = useState(false);
-  const [error,             setError]            = useState('');
+  const [name,             setName]            = useState(isEdit ? existing.name : '');
+  const [type,             setType]            = useState(lockedType || existing?.type || defaultType || 'mock');
+  const [rwCfg,            setRwCfg]           = useState(isEdit ? cfgFromSubject(existing.subjects?.reading_writing) : emptySubjectCfg());
+  const [mathCfg,          setMathCfg]         = useState(isEdit ? cfgFromSubject(existing.subjects?.math)            : emptySubjectCfg());
+  const [isDemoAccessible, setIsDemoAccessible] = useState(existing?.is_demo_accessible || false);
+  const [activeSubject,    setActiveSubject]   = useState(defaultSubject || 'rw');
+  const [loading,          setLoading]         = useState(false);
+  const [deleting,         setDeleting]        = useState(false);
+  const [confirmDel,       setConfirmDel]      = useState(false);
+  const [error,            setError]           = useState('');
 
-  const buildPayload = (subjectName, subject, cfg) => {
-    const total  = Number(cfg.m1.total_questions);
-    const toDiff = (d) => ({ easy: Number(d.easy||0), medium: Number(d.medium||0), hard: Number(d.hard||0) });
-    const toPct  = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
+  const buildSubjectPayload = (cfg) => {
+    const total   = Number(cfg.m1.total_questions);
+    const toDiff  = (d) => ({ easy: Number(d.easy||0), medium: Number(d.medium||0), hard: Number(d.hard||0) });
+    const toPct   = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
     const m2aDiff = toDiff(cfg.m2a.difficulty);
     const m2bDiff = toDiff(cfg.m2b.difficulty);
     return {
-      name: subjectName, subject, type,
-      is_demo_accessible: isDemoAccessible,
+      module_1:      { total_questions: total, time_limit_minutes: Number(cfg.m1.time_limit_minutes), difficulty_distribution: toDiff(cfg.m1.difficulty_distribution) },
+      module_2_easy: { total_questions: total, time_limit_minutes: Number(cfg.m2a.time_limit_minutes), difficulty_distribution: m2aDiff },
+      module_2_hard: { total_questions: total, time_limit_minutes: Number(cfg.m2b.time_limit_minutes), difficulty_distribution: m2bDiff },
       adaptive_threshold: Number(cfg.threshold),
-      module_1: { total_questions: total, time_limit_minutes: Number(cfg.m1.time_limit_minutes), difficulty_distribution: toDiff(cfg.m1.difficulty_distribution) },
-      module_2_easy:   { total_questions: total, time_limit_minutes: Number(cfg.m2a.time_limit_minutes), difficulty_distribution: m2aDiff },
-      module_2_medium: { total_questions: total, time_limit_minutes: Number(cfg.m2a.time_limit_minutes), difficulty_distribution: m2aDiff },
-      module_2_hard:   { total_questions: total, time_limit_minutes: Number(cfg.m2b.time_limit_minutes), difficulty_distribution: m2bDiff },
       score_bands: [
         { min_score: Number(cfg.threshold), label: 'Hard Tier', easy_pct: toPct(m2bDiff.easy), medium_pct: toPct(m2bDiff.medium), hard_pct: toPct(m2bDiff.hard) },
         { min_score: 0,                     label: 'Easy Tier', easy_pct: toPct(m2aDiff.easy), medium_pct: toPct(m2aDiff.medium), hard_pct: toPct(m2aDiff.hard) },
@@ -179,20 +179,20 @@ export function CreateSubjectModal({ onClose, onSaved, existing, defaultType, lo
 
   const validateSubject = (label, cfg) => {
     const total = Number(cfg.m1.total_questions);
-    if (!total)                              return `${label}: Module 1 total questions required.`;
-    if (!Number(cfg.m1.time_limit_minutes))  return `${label}: Module 1 time required.`;
+    if (!total)                                        return `${label}: Module 1 total questions required.`;
+    if (!Number(cfg.m1.time_limit_minutes))            return `${label}: Module 1 time required.`;
     if (diffSum(cfg.m1.difficulty_distribution) > total) return `${label}: Module 1 distribution exceeds total.`;
-    if (!Number(cfg.m2a.time_limit_minutes)) return `${label}: Module 2a time required.`;
-    if (diffSum(cfg.m2a.difficulty) !== total) return `${label}: Module 2a distribution must equal ${total}Q.`;
-    if (!Number(cfg.m2b.time_limit_minutes)) return `${label}: Module 2b time required.`;
-    if (diffSum(cfg.m2b.difficulty) !== total) return `${label}: Module 2b distribution must equal ${total}Q.`;
+    if (!Number(cfg.m2a.time_limit_minutes))           return `${label}: Module 2a time required.`;
+    if (diffSum(cfg.m2a.difficulty) !== total)         return `${label}: Module 2a distribution must equal ${total}Q.`;
+    if (!Number(cfg.m2b.time_limit_minutes))           return `${label}: Module 2b time required.`;
+    if (diffSum(cfg.m2b.difficulty) !== total)         return `${label}: Module 2b distribution must equal ${total}Q.`;
     return null;
   };
 
   const handleDelete = async () => {
     setDeleting(true); setError('');
     try {
-      await satAdminService.deleteExamConfig(existing._id);
+      await satTestConfigService.remove(existing.testId);
       onSaved(); onClose();
     } catch (e) { setError(e.message); }
     finally { setDeleting(false); }
@@ -200,56 +200,60 @@ export function CreateSubjectModal({ onClose, onSaved, existing, defaultType, lo
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Name is required.'); return; }
-    if (isEdit) {
-      const cfg = existing.subject === 'math' ? mathCfg : rwCfg;
-      const err = validateSubject(existing.subject === 'math' ? 'Math' : 'R&W', cfg);
-      if (err) { setError(err); return; }
-      setLoading(true); setError('');
-      try {
-        await satAdminService.updateExamConfig(existing._id, buildPayload(name, existing.subject, cfg));
-        onSaved(); onClose();
-      } catch (e) { setError(e.message); }
-      finally { setLoading(false); }
-    } else {
-      const errRw   = validateSubject('R&W',  rwCfg);
-      const errMath = validateSubject('Math', mathCfg);
-      if (errRw)   { setError(errRw);   return; }
-      if (errMath) { setError(errMath); return; }
-      setLoading(true); setError('');
-      try {
-        await Promise.all([
-          satAdminService.createExamConfig(buildPayload(`${name} — Reading & Writing`, 'reading_writing', rwCfg)),
-          satAdminService.createExamConfig(buildPayload(`${name} — Math`, 'math', mathCfg)),
-        ]);
-        onSaved(); onClose();
-      } catch (e) { setError(e.message); }
-      finally { setLoading(false); }
-    }
+    const errRw   = validateSubject('R&W',  rwCfg);
+    const errMath = validateSubject('Math', mathCfg);
+    if (errRw)   { setError(errRw);   return; }
+    if (errMath) { setError(errMath); return; }
+
+    const payload = {
+      name: name.trim(),
+      type,
+      is_demo_accessible: isDemoAccessible,
+      subjects: {
+        reading_writing: buildSubjectPayload(rwCfg),
+        math:            buildSubjectPayload(mathCfg),
+      },
+    };
+
+    setLoading(true); setError('');
+    try {
+      if (isEdit) await satTestConfigService.update(existing.testId, payload);
+      else        await satTestConfigService.create(payload);
+      onSaved(); onClose();
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
   };
 
   const typeLabel = type === 'diagnostic' ? 'Diagnostic' : 'Mock';
 
+  const subjectTabs = [
+    { key: 'rw',   label: 'Reading & Writing', cfg: rwCfg,   activeCls: 'border-blue-400 bg-blue-50 text-blue-700',      dotCls: 'bg-blue-500'   },
+    { key: 'math', label: 'Math',               cfg: mathCfg, activeCls: 'border-purple-400 bg-purple-50 text-purple-700', dotCls: 'bg-purple-500' },
+  ];
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-[18px] shadow-[0_20px_60px_rgba(0,0,0,0.2)] w-full max-w-3xl flex flex-col" style={{ height: '90vh' }}>
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100" style={{ flexShrink: 0 }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
           <h3 className="text-base font-bold text-gray-900">
-            {isEdit ? `Edit — ${existing.subject === 'math' ? 'Math' : 'Reading & Writing'}` : `Create ${typeLabel} Test`}
+            {isEdit ? `Edit — ${existing.name}` : `Create ${typeLabel} Test`}
           </h3>
           <button onClick={onClose} className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200">✕</button>
         </div>
+
+        {/* Body */}
         <div className="px-6 pt-5 flex flex-col gap-4" style={{ flex: '1 1 0', overflow: 'hidden', minHeight: 0 }}>
+          {/* Name + Type row */}
           <div className="grid grid-cols-2 gap-4 shrink-0">
             <div className="flex flex-col gap-1.5">
-              <label className={labelCls}>{isEdit ? 'Test Name' : 'Series Name'}</label>
+              <label className={labelCls}>Test Name</label>
               <input className={inputCls}
-                placeholder={isEdit ? '' : 'e.g. SAT Mock 1  →  creates Math & R&W versions'}
+                placeholder={isEdit ? '' : 'e.g. SAT Mock 1'}
                 value={name} onChange={e => setName(e.target.value)} />
-              {!isEdit && name && (
-                <p className="text-[10px] text-indigo-500">"{name} — Math" + "{name} — Reading &amp; Writing"</p>
-              )}
             </div>
-            {!lockedType && (
+            {!lockedType ? (
               <div className="flex flex-col gap-1.5">
                 <label className={labelCls}>Test Type</label>
                 <select className={inputCls} value={type} onChange={e => setType(e.target.value)} disabled={isEdit}>
@@ -258,35 +262,42 @@ export function CreateSubjectModal({ onClose, onSaved, existing, defaultType, lo
                 </select>
                 {type === 'diagnostic' && <p className="text-[10px] text-orange-600">Standard: R&amp;W 11–11Q · Math 9–9Q per module</p>}
               </div>
-            )}
-            {lockedType && type === 'diagnostic' && (
+            ) : (
               <div className="flex flex-col gap-1.5">
                 <label className={labelCls}>Test Type</label>
-                <div className="h-9 px-3 rounded-[10px] border border-gray-200 text-sm bg-gray-50 text-gray-500 flex items-center">Diagnostic</div>
-                <p className="text-[10px] text-orange-600">Standard: R&amp;W 11–11Q · Math 9–9Q per module</p>
+                <div className="h-9 px-3 rounded-[10px] border border-gray-200 text-sm bg-gray-50 text-gray-500 flex items-center capitalize">{type}</div>
+                {type === 'diagnostic' && <p className="text-[10px] text-orange-600">Standard: R&amp;W 11–11Q · Math 9–9Q per module</p>}
               </div>
             )}
           </div>
 
-          {isEdit ? (
-            <div style={{ flex: '1 1 0', minHeight: 0 }} className="pb-5">
-              {existing.subject === 'reading_writing' ? (
+          {/* Subject tabs + panel */}
+          <div className="flex flex-col pb-5" style={{ flex: '1 1 0', minHeight: 0 }}>
+            <div className="flex gap-2 mb-4 shrink-0">
+              {subjectTabs.map(({ key, label, cfg, activeCls, dotCls }) => {
+                const isActive = activeSubject === key;
+                const hasData  = Number(cfg.m1.total_questions) > 0;
+                return (
+                  <button key={key} onClick={() => setActiveSubject(key)}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-[12px] text-sm font-semibold border-2 transition-all
+                      ${isActive ? activeCls : 'border-gray-200 bg-white text-gray-400 hover:bg-gray-50 hover:text-gray-600'}`}>
+                    {hasData && <span className={`w-2 h-2 rounded-full ${dotCls}`} />}
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ flex: '1 1 0', minHeight: 0 }}>
+              {activeSubject === 'rw' ? (
                 <SubjectSection title="Reading & Writing" borderCls="border-blue-200" headerCls="bg-blue-50 text-blue-700" value={rwCfg} onChange={setRwCfg} />
               ) : (
                 <SubjectSection title="Math" borderCls="border-purple-200" headerCls="bg-purple-50 text-purple-700" value={mathCfg} onChange={setMathCfg} />
               )}
             </div>
-          ) : (
-            <div className="flex flex-col gap-4 pb-5" style={{ flex: '1 1 0', minHeight: 0 }}>
-              <div style={{ flex: '1 1 0', minHeight: 0 }}>
-                <SubjectSection title="Reading & Writing" borderCls="border-blue-200" headerCls="bg-blue-50 text-blue-700" value={rwCfg} onChange={setRwCfg} />
-              </div>
-              <div style={{ flex: '1 1 0', minHeight: 0 }}>
-                <SubjectSection title="Math" borderCls="border-purple-200" headerCls="bg-purple-50 text-purple-700" value={mathCfg} onChange={setMathCfg} />
-              </div>
-            </div>
-          )}
+          </div>
         </div>
+
+        {/* Demo access */}
         <div className="px-6 py-3 border-t border-gray-100 shrink-0">
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={isDemoAccessible}
@@ -295,11 +306,13 @@ export function CreateSubjectModal({ onClose, onSaved, existing, defaultType, lo
             <span className="text-sm text-gray-700">Accessible to demo/guest users</span>
           </label>
         </div>
-        <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-3" style={{ flexShrink: 0 }}>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex flex-col gap-3 shrink-0">
           {error && <p className="text-sm text-red-500 bg-red-50 rounded-[10px] px-3 py-2">{error}</p>}
           {confirmDel && (
             <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-[10px] px-3 py-2.5">
-              <span className="text-sm text-red-700 flex-1">Delete this config permanently?</span>
+              <span className="text-sm text-red-700 flex-1">Delete "{existing.name}" permanently?</span>
               <button onClick={() => setConfirmDel(false)} className="text-xs px-3 py-1.5 rounded-[8px] border border-gray-200 bg-white text-gray-600 hover:bg-gray-50">Cancel</button>
               <button onClick={handleDelete} disabled={deleting}
                 className="text-xs px-3 py-1.5 rounded-[8px] bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-50">
@@ -318,7 +331,7 @@ export function CreateSubjectModal({ onClose, onSaved, existing, defaultType, lo
               <button onClick={onClose} className="px-4 py-2 rounded-[10px] border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
               <button onClick={handleSave} disabled={loading}
                 className="px-5 py-2 rounded-[10px] bg-ops-primary text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors">
-                {loading ? 'Saving…' : isEdit ? 'Save Changes' : `Create ${typeLabel} Tests`}
+                {loading ? 'Saving…' : isEdit ? 'Save Changes' : `Create ${typeLabel} Test`}
               </button>
             </div>
           </div>
@@ -586,24 +599,28 @@ export function SubjectConfigCard({ config, onEdit }) {
   );
 }
 
-// ── Diagnostic / Mock pair card (grouped as one test entity) ─────────────────
-export function DiagnosticPairCard({ seriesName, mathConfig, rwConfig, onEdit, onToggleDemo, type = 'diagnostic' }) {
+// ── Unified test config card (Mock or Diagnostic) ────────────────────────────
+// config  — full SatTestConfig document { testId, name, type, is_demo_accessible, subjects }
+// onEdit(subject)  — called with 'rw' or 'math' to open the modal on that tab
+// onToggleDemo()   — called with no args; parent handles the API call
+export function DiagnosticPairCard({ config, onEdit, onToggleDemo }) {
   const [toggling, setToggling] = useState(false);
+
+  const { name, type = 'mock', is_demo_accessible: isDemoAccessible, subjects = {} } = config;
+  const mathSubj = subjects.math;
+  const rwSubj   = subjects.reading_writing;
 
   const typeLabel = type === 'diagnostic' ? 'Diagnostic' : 'Mock';
   const typeBadge = type === 'diagnostic' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700';
-  const m1Q = mathConfig?.module_1?.total_questions;
-  const rwQ = rwConfig?.module_1?.total_questions;
-  const threshold = mathConfig?.adaptive_threshold ?? rwConfig?.adaptive_threshold;
 
-  // True only when ALL present configs are marked accessible (consistent with student portal)
-  const presentConfigs = [mathConfig, rwConfig].filter(Boolean);
-  const isDemoAccessible = presentConfigs.length > 0 && presentConfigs.every(c => c.is_demo_accessible);
+  const m1MathQ = mathSubj?.module_1?.total_questions;
+  const m1RwQ   = rwSubj?.module_1?.total_questions;
+  const threshold = mathSubj?.adaptive_threshold ?? rwSubj?.adaptive_threshold;
 
   const handleToggle = async () => {
     if (!onToggleDemo || toggling) return;
     setToggling(true);
-    try { await onToggleDemo(!isDemoAccessible); }
+    try { await onToggleDemo(); }
     finally { setToggling(false); }
   };
 
@@ -611,7 +628,7 @@ export function DiagnosticPairCard({ seriesName, mathConfig, rwConfig, onEdit, o
     <div className={`bg-white rounded-[14px] border p-5 flex flex-col gap-3 transition-colors ${isDemoAccessible ? 'border-amber-200' : 'border-gray-200'}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="font-semibold text-gray-900 text-sm">{seriesName}</h3>
+          <h3 className="font-semibold text-gray-900 text-sm">{name}</h3>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${typeBadge}`}>{typeLabel}</span>
             <span className="text-[10px] text-gray-400">Adaptive · 2 subjects</span>
@@ -633,7 +650,6 @@ export function DiagnosticPairCard({ seriesName, mathConfig, rwConfig, onEdit, o
                 : 'bg-gray-50 border-gray-200 text-gray-400 hover:bg-gray-100'
               } ${toggling ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
           >
-            {/* Toggle pill */}
             <span className={`relative inline-flex w-7 h-4 rounded-full transition-colors ${isDemoAccessible ? 'bg-amber-400' : 'bg-gray-300'}`}>
               <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform duration-200 ${isDemoAccessible ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
             </span>
@@ -645,26 +661,22 @@ export function DiagnosticPairCard({ seriesName, mathConfig, rwConfig, onEdit, o
       <div className="rounded-[10px] border border-gray-100 bg-gray-50 px-4 py-3 flex items-center gap-4">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">R&amp;W</span>
-          <span className="text-[12px] text-gray-600 font-medium">{rwQ ? `${rwQ}Q / module` : 'Not configured'}</span>
+          <span className="text-[12px] text-gray-600 font-medium">{m1RwQ ? `${m1RwQ}Q / module` : 'Not configured'}</span>
         </div>
         <span className="text-gray-300">|</span>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Math</span>
-          <span className="text-[12px] text-gray-600 font-medium">{m1Q ? `${m1Q}Q / module` : 'Not configured'}</span>
+          <span className="text-[12px] text-gray-600 font-medium">{m1MathQ ? `${m1MathQ}Q / module` : 'Not configured'}</span>
         </div>
         <div className="ml-auto flex gap-2">
-          {rwConfig && (
-            <button onClick={() => onEdit(rwConfig)}
-              className="text-[11px] px-2.5 py-1 rounded-[7px] border border-blue-200 text-blue-600 bg-white hover:bg-blue-50 font-medium">
-              Edit R&amp;W
-            </button>
-          )}
-          {mathConfig && (
-            <button onClick={() => onEdit(mathConfig)}
-              className="text-[11px] px-2.5 py-1 rounded-[7px] border border-purple-200 text-purple-600 bg-white hover:bg-purple-50 font-medium">
-              Edit Math
-            </button>
-          )}
+          <button onClick={() => onEdit('rw')}
+            className="text-[11px] px-2.5 py-1 rounded-[7px] border border-blue-200 text-blue-600 bg-white hover:bg-blue-50 font-medium">
+            Edit R&amp;W
+          </button>
+          <button onClick={() => onEdit('math')}
+            className="text-[11px] px-2.5 py-1 rounded-[7px] border border-purple-200 text-purple-600 bg-white hover:bg-purple-50 font-medium">
+            Edit Math
+          </button>
         </div>
       </div>
     </div>

@@ -3,43 +3,35 @@
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react';
-import { satAdminService } from '../../../services/api';
+import { satTestConfigService } from '../../../services/api';
 import { CreateSubjectModal, DiagnosticPairCard } from './examConfigShared';
-
-const getSeriesName = (name) => name.replace(/ — (Math|Reading & Writing)$/, '').trim();
 
 export default function MockTestsPage() {
   const [configs,   setConfigs]   = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [editing,   setEditing]   = useState(null);
+  const [editing,   setEditing]   = useState(null); // { config, subject }
 
   const loadConfigs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await satAdminService.getExamConfigs();
-      setConfigs(res.data.filter(c => c.type === 'mock' || !c.type));
+      const res = await satTestConfigService.getAll({ type: 'mock' });
+      setConfigs(res.data);
     } catch { console.error('Failed to load mock configs'); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { loadConfigs(); }, [loadConfigs]);
 
-  // Group paired configs by series name
-  const groups = configs.reduce((acc, c) => {
-    const series = getSeriesName(c.name);
-    if (!acc[series]) acc[series] = { seriesName: series, math: null, rw: null };
-    if (c.subject === 'math') acc[series].math = c;
-    else acc[series].rw = c;
-    return acc;
-  }, {});
-  const groupList = Object.values(groups);
-
   const openCreate = () => { setEditing(null); setShowModal(true); };
-  const openEdit   = (cfg) => { setEditing(cfg); setShowModal(true); };
 
-  const handleToggleDemo = async (g, newValue) => {
-    await satAdminService.patchPairDemoAccess(g.math?._id, g.rw?._id, newValue);
+  const openEdit = (config, subject) => {
+    setEditing({ config, subject });
+    setShowModal(true);
+  };
+
+  const handleToggleDemo = async (config) => {
+    await satTestConfigService.patchDemoAccess(config.testId, !config.is_demo_accessible);
     loadConfigs();
   };
 
@@ -62,7 +54,7 @@ export default function MockTestsPage() {
         <div className="bg-white rounded-[14px] border border-gray-200 p-4 flex items-center gap-3">
           <span className="text-2xl">📋</span>
           <div>
-            <div className="text-2xl font-bold text-ops-primary">{groupList.length}</div>
+            <div className="text-2xl font-bold text-ops-primary">{configs.length}</div>
             <div className="text-xs text-gray-500">Mock Tests</div>
           </div>
         </div>
@@ -73,7 +65,7 @@ export default function MockTestsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {[...Array(4)].map((_, i) => <div key={i} className="h-40 bg-gray-100 rounded-[14px] animate-pulse" />)}
         </div>
-      ) : groupList.length === 0 ? (
+      ) : configs.length === 0 ? (
         <div className="bg-white rounded-[14px] border border-gray-200 p-12 text-center text-gray-400">
           <p className="text-4xl mb-3">📋</p>
           <p className="font-semibold text-gray-600">No mock tests configured yet</p>
@@ -81,15 +73,12 @@ export default function MockTestsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {groupList.map(g => (
+          {configs.map(config => (
             <DiagnosticPairCard
-              key={g.seriesName}
-              seriesName={g.seriesName}
-              mathConfig={g.math}
-              rwConfig={g.rw}
-              onEdit={openEdit}
-              onToggleDemo={(newVal) => handleToggleDemo(g, newVal)}
-              type="mock"
+              key={config.testId}
+              config={config}
+              onEdit={(subject) => openEdit(config, subject)}
+              onToggleDemo={() => handleToggleDemo(config)}
             />
           ))}
         </div>
@@ -99,7 +88,8 @@ export default function MockTestsPage() {
         <CreateSubjectModal
           onClose={() => { setShowModal(false); setEditing(null); }}
           onSaved={loadConfigs}
-          existing={editing}
+          existing={editing?.config ?? null}
+          defaultSubject={editing?.subject ?? 'rw'}
           defaultType="mock"
           lockedType="mock"
         />

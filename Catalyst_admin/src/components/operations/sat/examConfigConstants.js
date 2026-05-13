@@ -74,31 +74,33 @@ export const emptySubjectCfg = () => ({
   threshold: 60,
 });
 
-export const cfgFromExisting = (cfg) => ({
+// Maps one subject block from the unified SatTestConfig document into form state.
+// Pass existing.subjects.reading_writing or existing.subjects.math.
+export const cfgFromSubject = (subj) => ({
   m1: {
-    total_questions:    cfg.module_1?.total_questions    ?? '',
-    time_limit_minutes: cfg.module_1?.time_limit_minutes ?? '',
+    total_questions:    subj?.module_1?.total_questions    ?? '',
+    time_limit_minutes: subj?.module_1?.time_limit_minutes ?? '',
     difficulty_distribution: {
-      easy:   cfg.module_1?.difficulty_distribution?.easy   ?? '',
-      medium: cfg.module_1?.difficulty_distribution?.medium ?? '',
-      hard:   cfg.module_1?.difficulty_distribution?.hard   ?? '',
+      easy:   subj?.module_1?.difficulty_distribution?.easy   ?? '',
+      medium: subj?.module_1?.difficulty_distribution?.medium ?? '',
+      hard:   subj?.module_1?.difficulty_distribution?.hard   ?? '',
     },
   },
   m2a: {
-    time_limit_minutes: cfg.module_2_easy?.time_limit_minutes ?? '',
+    time_limit_minutes: subj?.module_2_easy?.time_limit_minutes ?? '',
     difficulty: {
-      easy:   cfg.module_2_easy?.difficulty_distribution?.easy   ?? '',
-      medium: cfg.module_2_easy?.difficulty_distribution?.medium ?? '',
-      hard:   cfg.module_2_easy?.difficulty_distribution?.hard   ?? '',
+      easy:   subj?.module_2_easy?.difficulty_distribution?.easy   ?? '',
+      medium: subj?.module_2_easy?.difficulty_distribution?.medium ?? '',
+      hard:   subj?.module_2_easy?.difficulty_distribution?.hard   ?? '',
     },
   },
   m2b: {
-    time_limit_minutes: cfg.module_2_hard?.time_limit_minutes ?? '',
+    time_limit_minutes: subj?.module_2_hard?.time_limit_minutes ?? '',
     difficulty: {
-      easy:   cfg.module_2_hard?.difficulty_distribution?.easy   ?? '',
-      medium: cfg.module_2_hard?.difficulty_distribution?.medium ?? '',
-      hard:   cfg.module_2_hard?.difficulty_distribution?.hard   ?? '',
+      easy:   subj?.module_2_hard?.difficulty_distribution?.easy   ?? '',
+      medium: subj?.module_2_hard?.difficulty_distribution?.medium ?? '',
+      hard:   subj?.module_2_hard?.difficulty_distribution?.hard   ?? '',
     },
   },
-  threshold: cfg.adaptive_threshold ?? 60,
+  threshold: subj?.adaptive_threshold ?? 60,
 });

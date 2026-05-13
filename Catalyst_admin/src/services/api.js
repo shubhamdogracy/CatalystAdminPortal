@@ -90,6 +90,17 @@ export const satAdminService = {
   deletePracticeConfig:  (id)           => req(`/sat/admin/practice-configs/${id}`, { method: 'DELETE' }),
 };
 
+// ── Unified test configs (mock + diagnostic) — new single-document schema ─────
+export const satTestConfigService = {
+  getAll:          (params = {})             => { const qs = new URLSearchParams(params).toString(); return req(`/sat/admin/test-configs${qs ? `?${qs}` : ''}`); },
+  getById:         (testId)                  => req(`/sat/admin/test-configs/${testId}`),
+  create:          (payload)                 => req('/sat/admin/test-configs', { method: 'POST', body: JSON.stringify(payload) }),
+  update:          (testId, payload)         => req(`/sat/admin/test-configs/${testId}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  updateSubject:   (testId, subject, payload) => req(`/sat/admin/test-configs/${testId}/subjects/${subject}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  patchDemoAccess: (testId, is_demo_accessible) => req(`/sat/admin/test-configs/${testId}/demo-access`, { method: 'PATCH', body: JSON.stringify({ is_demo_accessible }) }),
+  remove:          (testId)                  => req(`/sat/admin/test-configs/${testId}`, { method: 'DELETE' }),
+};
+
 export const satMentorService = {
   // Available test configs (for assign page)
   getAvailableTests:          ()            => req('/sat/mentor/exam-configs'),
