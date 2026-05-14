@@ -423,7 +423,7 @@ export default function MentorDashboard() {
               <div className="px-5 py-8 text-center text-sm" style={{ color: P.textLight }}>No batches yet</div>
             ) : (
               <div className="p-3 flex flex-col gap-2">
-                {batches.map((b, idx) => {
+                {batches.map((b) => {
                   const pct     = Math.round(((b.completedSessions || 0) / (b.totalSessions || 1)) * 100);
                   const isActive = b.status === 'active';
                   return (

@@ -1703,7 +1703,7 @@ export default function StudentProfile() {
   const [practiceResult, setPracticeResult]               = useState(null);
   const [practiceResultLoading, setPracticeResultLoading] = useState(null);
   const [fullLengthResult, setFullLengthResult]           = useState(null);
-  const [studentAssignments, setStudentAssignments]       = useState([]);
+  const [_studentAssignments, setStudentAssignments]      = useState([]);
 
   useEffect(() => {
     studentService.getById(id)
@@ -1786,9 +1786,6 @@ export default function StudentProfile() {
   const isActive      = student.isActive !== false;
   const batch         = student.batches?.[0];
   const mentor        = batch?.mentorId;
-  const sessionsDone  = student.completedSessions || 0;
-  const totalSess     = student.totalSessions || batch?.totalSessions || 0;
-  const batchPct      = Math.round(((batch?.completedSessions || 0) / (batch?.totalSessions || 1)) * 100);
   // Sessions from full-length tests carry a synthetic exam_config_id: { type } object.
   // Sessions from standalone tests have exam_config_id populated from DB (always has type due to schema default).
   // Guard against null exam_config_id (e.g. config deleted after session was created).
