@@ -104,7 +104,7 @@ export default function AddMentorPage() {
             <h3 className="text-[13px] font-bold text-ops-primary uppercase tracking-[0.5px]">Personal Information</h3>
             <div className="grid grid-cols-2 gap-3.5">
               <Field label="Full Name *" error={errors.name}>
-                <input className={inputClass} type="text" placeholder="e.g. Arjun Sharma" value={form.name} onChange={(e) => set('name', e.target.value)} />
+                <input className={inputClass} type="text" placeholder="Enter full name" value={form.name} onChange={(e) => set('name', e.target.value)} />
               </Field>
               <Field label="Email Address *" error={errors.email}>
                 <input className={inputClass} type="email" placeholder="mentor@example.com" value={form.email} onChange={(e) => set('email', e.target.value)} />

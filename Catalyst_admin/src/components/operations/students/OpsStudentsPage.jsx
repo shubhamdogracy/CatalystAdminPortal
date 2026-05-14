@@ -1,6 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { studentService, mentorService } from '../../../services/api';
+import { studentService, mentorService, satMentorService } from '../../../services/api';
+
+// Shared formula — identical to mentor portal
+function computeTestProgress(adaptiveSessions, practiceSessions) {
+  const avgPct = (sessions) => {
+    const done = sessions.filter(s => s.status === 'complete' || s.status === 'completed');
+    if (done.length === 0) return null;
+    const sum = done.reduce((acc, s) => acc + (s.percentage ?? s.total_percentage ?? 0), 0);
+    return Math.round(sum / done.length);
+  };
+  const diagnosticPct = avgPct(adaptiveSessions.filter(s => s.exam_config_id?.type === 'diagnostic'));
+  const mockPct       = avgPct(adaptiveSessions.filter(s => s.exam_config_id?.type === 'mock' || (s.exam_config_id && !s.exam_config_id.type)));
+  const practicePct   = avgPct(practiceSessions);
+  const cats = [diagnosticPct, mockPct, practicePct].filter(v => v !== null);
+  return cats.length > 0 ? Math.round(cats.reduce((a, b) => a + b, 0) / cats.length) : 0;
+}
 
 const inputClass = 'px-3 py-2 rounded-lg border-[1.5px] border-gray-200 text-[13px] outline-none bg-white text-gray-700';
 
@@ -42,27 +57,51 @@ function GrantAccessModal({ student, onConfirm, onClose, loading }) {
 
 export default function OpsStudentsPage() {
   const navigate = useNavigate();
-  const [students, setStudents]     = useState([]);
-  const [mentors, setMentors]       = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState('');
-  const [grantTarget, setGrantTarget] = useState(null);
+  const [students, setStudents]         = useState([]);
+  const [mentors, setMentors]           = useState([]);
+  const [progressMap, setProgressMap]   = useState({});
+  const [loading, setLoading]           = useState(true);
+  const [progressLoading, setProgressLoading] = useState(false);
+  const [error, setError]               = useState('');
+  const [grantTarget, setGrantTarget]   = useState(null);
   const [grantLoading, setGrantLoading] = useState(false);
 
   const [search, setSearch]             = useState('');
   const [filterMentor, setFilterMentor] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCourse, setFilterCourse] = useState('all');
-  const [filterType, setFilterType]     = useState('all'); // 'all' | 'guest' | 'student'
+  const [filterType, setFilterType]     = useState('all');
 
   const loadStudents = () => {
+    setLoading(true);
     Promise.all([studentService.getAll(), mentorService.getAll()])
       .then(([sRes, mRes]) => {
-        setStudents(sRes.data);
-        setMentors(mRes.data);
+        const list = sRes.data || [];
+        setStudents(list);
+        setMentors(mRes.data || []);
+        setLoading(false);
+
+        // Load test-based progress for all non-guest students in parallel
+        const scorable = list.filter(s => s.accountType !== 'guest');
+        if (scorable.length === 0) return;
+        setProgressLoading(true);
+        Promise.all(
+          scorable.map(s =>
+            Promise.all([
+              satMentorService.getStudentSessions(s._id).catch(() => ({ data: [] })),
+              satMentorService.getStudentPracticeSessions(s._id).catch(() => ({ data: [] })),
+            ]).then(([aRes, pRes]) => ({
+              id: s._id,
+              prog: computeTestProgress(aRes.data || [], pRes.data || []),
+            }))
+          )
+        ).then(results => {
+          const map = {};
+          results.forEach(({ id, prog }) => { map[id] = prog; });
+          setProgressMap(map);
+        }).finally(() => setProgressLoading(false));
       })
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch(err => { setError(err.message); setLoading(false); });
   };
 
   useEffect(() => { loadStudents(); }, []);
@@ -90,12 +129,7 @@ export default function OpsStudentsPage() {
     return matchSearch && matchMentor && matchStatus && matchCourse && matchType;
   });
 
-  // const avgProgress = students.filter(s => s.accountType !== 'guest').length
-  //   ? Math.round(
-  //       students.filter(s => s.accountType !== 'guest').reduce((a, s) => a + (s.progress || 0), 0) /
-  //       students.filter(s => s.accountType !== 'guest').length
-  //     )
-  //   : 0;
+  const getProgress = (id) => progressMap[id] ?? 0;
 
   const handleGrantAccess = async () => {
     if (!grantTarget) return;
@@ -207,14 +241,14 @@ export default function OpsStudentsPage() {
 
       {/* Table */}
       <div className="bg-white rounded-[14px] border border-gray-200 overflow-hidden overflow-x-auto">
-        <div className="min-w-[720px]">
+        <div className="min-w-[780px]">
         <div className="flex px-5 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-[0.4px] gap-3">
           <span className="flex-[2]">Student</span>
           <span className="flex-[2]">Course / Batch</span>
           <span className="flex-[2]">Mentor</span>
           <span className="flex-1">Progress</span>
           <span className="flex-1">Status</span>
-          <span className="w-[110px]">Action</span>
+          <span className="w-[160px]">Actions</span>
         </div>
 
         {loading ? (
@@ -232,8 +266,8 @@ export default function OpsStudentsPage() {
           const mentorList     = [...new Map(batches.map(b => b?.mentorId).filter(Boolean).map(m => [m._id?.toString(), m])).values()];
           const isGuest        = s.accountType === 'guest';
           const isActive       = s.isActive !== false;
-          const progress       = s.progress || 0;
-          const pc             = progress >= 80 ? '#10b981' : progress >= 50 ? '#f59e0b' : '#ef4444';
+          const progress = getProgress(s._id);
+          const pc       = progress >= 80 ? '#10b981' : progress >= 50 ? '#f59e0b' : '#ef4444';
 
           return (
             <div key={s._id} className={`flex items-center px-5 py-3 border-b border-gray-100 gap-3 ${isGuest ? 'bg-amber-50/40' : ''}`}>
@@ -282,10 +316,16 @@ export default function OpsStudentsPage() {
                   <p className="text-[12px] text-amber-600 font-medium">Trial</p>
                 ) : (
                   <>
-                    <p className="text-[13px] font-bold" style={{ color: pc }}>{progress}%</p>
-                    <div className="h-1 bg-gray-200 rounded-full overflow-hidden mt-1">
-                      <div className="h-full rounded-full" style={{ width: `${progress}%`, background: pc }} />
-                    </div>
+                    {progressLoading && progressMap[s._id] === undefined ? (
+                      <div className="h-3 w-16 bg-gray-100 rounded animate-pulse" />
+                    ) : (
+                      <>
+                        <p className="text-[13px] font-bold" style={{ color: pc }}>{progress}%</p>
+                        <div className="h-1 bg-gray-200 rounded-full overflow-hidden mt-1">
+                          <div className="h-full rounded-full" style={{ width: `${progress}%`, background: pc }} />
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -303,14 +343,22 @@ export default function OpsStudentsPage() {
                   {isGuest ? 'guest' : isActive ? 'active' : 'inactive'}
                 </span>
               </div>
-              <div className="w-[110px]">
+              <div className="w-[160px] flex items-center gap-1.5">
                 {isGuest ? (
-                  <button
-                    onClick={() => setGrantTarget(s)}
-                    className="px-3 py-1.5 rounded-lg text-[12px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors whitespace-nowrap"
-                  >
-                    Grant Access
-                  </button>
+                  <>
+                    <button
+                      onClick={() => navigate(`/operations/students/${s._id}`)}
+                      className="px-2.5 py-1.5 rounded-lg text-[12px] font-semibold text-indigo-600 border border-indigo-200 hover:bg-indigo-50 transition-colors whitespace-nowrap"
+                    >
+                      View Reports
+                    </button>
+                    <button
+                      onClick={() => setGrantTarget(s)}
+                      className="px-2.5 py-1.5 rounded-lg text-[12px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors whitespace-nowrap"
+                    >
+                      Grant Access
+                    </button>
+                  </>
                 ) : (
                   <button
                     onClick={() => navigate(`/operations/students/${s._id}`)}

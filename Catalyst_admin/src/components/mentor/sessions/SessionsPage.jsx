@@ -4,7 +4,6 @@
 
 import { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { MOCK_SESSIONS } from '../../../data/mockData';
 
 const meetIcon = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>;
 
@@ -67,12 +66,12 @@ function SessionCard({ session }) {
 }
 
 export default function SessionsPage() {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const [tab, setTab] = useState('upcoming');
 
-  const sessions  = MOCK_SESSIONS.filter((s) => s.mentorId === user?.id);
-  const upcoming  = sessions.filter((s) => s.status === 'upcoming');
-  const completed = sessions.filter((s) => s.status === 'completed');
+  const sessions  = [];
+  const upcoming  = [];
+  const completed = [];
   const shown     = tab === 'upcoming' ? upcoming : completed;
 
   return (

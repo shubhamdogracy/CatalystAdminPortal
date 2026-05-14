@@ -4,7 +4,6 @@
 
 import { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { MOCK_SLOTS, MOCK_STUDENTS } from '../../../data/mockData';
 
 function MiniCalendar({ slots, selectedDate, onSelect }) {
   const [viewDate, setViewDate] = useState(new Date(2025, 3, 1));
@@ -203,13 +202,13 @@ function SlotCard({ slot, statusColor, onEdit, onDelete }) {
 
 export default function SlotsPage() {
   const { user } = useAuth();
-  const [slots, setSlots]           = useState(MOCK_SLOTS.filter((s) => s.mentorId === user?.id));
+  const [slots, setSlots]           = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
   const [showModal, setShowModal]   = useState(false);
   const [editSlot, setEditSlot]     = useState(null);
   const [view, setView]             = useState('list');
 
-  const myStudents   = MOCK_STUDENTS.filter((s) => s.mentorId === user?.id);
+  const myStudents   = [];
   const visibleSlots = selectedDate ? slots.filter((s) => s.date === selectedDate) : slots;
 
   const handleSave = (form) => {

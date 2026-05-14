@@ -5,14 +5,13 @@
 // ============================================================
 
 import { createContext, useContext, useState } from 'react';
-import { MOCK_MENTORS, MOCK_NOTIFICATIONS, MOCK_OPS_NOTIFICATIONS, MOCK_BATCHES, MOCK_STUDENTS } from '../data/mockData';
 
 const DataContext = createContext(null);
 
 export function DataProvider({ children }) {
-  const [mentors, setMentors]   = useState(MOCK_MENTORS);
-  const [batches, setBatches]   = useState(MOCK_BATCHES);
-  const [students, setStudents] = useState(MOCK_STUDENTS);
+  const [mentors, setMentors]   = useState([]);
+  const [batches, setBatches]   = useState([]);
+  const [students, setStudents] = useState([]);
 
   // ── Batch mutations ───────────────────────────────────────
   const addBatch = (batch) => setBatches((p) => [...p, batch]);
@@ -53,7 +52,7 @@ export function DataProvider({ children }) {
   const addStudent = (student) => setStudents((p) => [...p, student]);
 
   // ── Mentor notifications ──────────────────────────────────
-  const [mentorNotifications, setMentorNotifications] = useState(MOCK_NOTIFICATIONS);
+  const [mentorNotifications, setMentorNotifications] = useState([]);
 
   const markMentorNotifRead = (id) =>
     setMentorNotifications(p => p.map(n => n.id === id ? { ...n, read: true } : n));
@@ -65,7 +64,7 @@ export function DataProvider({ children }) {
     setMentorNotifications(p => p.filter(n => n.id !== id));
 
   // ── Operations notifications ──────────────────────────────
-  const [opsNotifications, setOpsNotifications] = useState(MOCK_OPS_NOTIFICATIONS);
+  const [opsNotifications, setOpsNotifications] = useState([]);
 
   const markOpsNotifRead = (id) =>
     setOpsNotifications(p => p.map(n => n.id === id ? { ...n, read: true } : n));
