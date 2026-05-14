@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { studentService } from '../../../services/api';
+import { studentService, satMentorService } from '../../../services/api';
 
 const searchIcon = <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
 
@@ -21,17 +21,34 @@ function ProgressBar({ value }) {
   );
 }
 
+// Shared formula — must match StudentProfile exactly
+function computeTestProgress(adaptiveSessions, practiceSessions) {
+  const avgPct = (sessions) => {
+    const done = sessions.filter(s => s.status === 'complete' || s.status === 'completed');
+    if (done.length === 0) return null;
+    const sum = done.reduce((acc, s) => acc + (s.percentage ?? s.total_percentage ?? 0), 0);
+    return Math.round(sum / done.length);
+  };
+  const diagnosticPct = avgPct(adaptiveSessions.filter(s => s.exam_config_id?.type === 'diagnostic'));
+  const mockPct       = avgPct(adaptiveSessions.filter(s => s.exam_config_id?.type === 'mock' || (s.exam_config_id && !s.exam_config_id.type)));
+  const practicePct   = avgPct(practiceSessions);
+  const cats = [diagnosticPct, mockPct, practicePct].filter(v => v !== null);
+  return cats.length > 0 ? Math.round(cats.reduce((a, b) => a + b, 0) / cats.length) : 0;
+}
+
 export default function StudentsPage() {
   const navigate    = useNavigate();
   const { user }    = useAuth();
 
-  const [students, setStudents]       = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState('');
-  const [search, setSearch]           = useState('');
+  const [students, setStudents]         = useState([]);
+  const [progressMap, setProgressMap]   = useState({});
+  const [loading, setLoading]           = useState(true);
+  const [progressLoading, setProgressLoading] = useState(false);
+  const [error, setError]               = useState('');
+  const [search, setSearch]             = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCourse, setFilterCourse] = useState('all');
-  const [sortBy, setSortBy]           = useState('name');
+  const [sortBy, setSortBy]             = useState('name');
 
   useEffect(() => {
     if (!user?._id) return;
@@ -39,10 +56,30 @@ export default function StudentsPage() {
       .then(res => {
         const list = (res.data || []).map(({ student, batch }) => ({ ...student, batch }));
         setStudents(list);
+        setLoading(false);
+
+        if (list.length === 0) return;
+        setProgressLoading(true);
+        Promise.all(
+          list.map(s =>
+            Promise.all([
+              satMentorService.getStudentSessions(s._id).catch(() => ({ data: [] })),
+              satMentorService.getStudentPracticeSessions(s._id).catch(() => ({ data: [] })),
+            ]).then(([aRes, pRes]) => ({
+              id: s._id,
+              prog: computeTestProgress(aRes.data || [], pRes.data || []),
+            }))
+          )
+        ).then(results => {
+          const map = {};
+          results.forEach(({ id, prog }) => { map[id] = prog; });
+          setProgressMap(map);
+        }).finally(() => setProgressLoading(false));
       })
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch(err => { setError(err.message); setLoading(false); });
   }, [user?._id]);
+
+  const getProgress = (id) => progressMap[id] ?? 0;
 
   const courses = [...new Set(students.map(s => s.batch?.subject).filter(Boolean))];
 
@@ -59,14 +96,14 @@ export default function StudentsPage() {
     })
     .sort((a, b) => {
       if (sortBy === 'name')     return a.name.localeCompare(b.name);
-      if (sortBy === 'progress') return (b.progress || 0) - (a.progress || 0);
+      if (sortBy === 'progress') return getProgress(b._id) - getProgress(a._id);
       if (sortBy === 'joined')   return new Date(b.enrollmentDate || 0) - new Date(a.enrollmentDate || 0);
       return 0;
     });
 
   const activeCount = students.filter(s => s.isActive !== false).length;
   const avgProgress = students.length
-    ? Math.round(students.reduce((a, s) => a + (s.progress || 0), 0) / students.length)
+    ? Math.round(students.reduce((acc, s) => acc + getProgress(s._id), 0) / students.length)
     : 0;
 
   return (
@@ -83,7 +120,7 @@ export default function StudentsPage() {
           { label: 'Total',        value: students.length,                color: '#0d9488', bg: '#f0fdfa' },
           { label: 'Active',       value: activeCount,                    color: '#10b981', bg: '#d1fae5' },
           { label: 'Inactive',     value: students.length - activeCount,  color: '#ef4444', bg: '#fee2e2' },
-          { label: 'Avg Progress', value: `${avgProgress}%`,              color: '#7c3aed', bg: '#ede9fe' },
+          { label: 'Avg Progress', value: progressLoading ? '…' : `${avgProgress}%`, color: '#7c3aed', bg: '#ede9fe' },
         ].map(c => (
           <div key={c.label} className="rounded-xl px-5 py-4 border border-black/5" style={{ background: c.bg }}>
             <p className="text-[22px] font-extrabold" style={{ color: c.color }}>{c.value}</p>
@@ -143,8 +180,8 @@ export default function StudentsPage() {
           </div>
         ) : (
           filtered.map(student => {
-            const isActive  = student.isActive !== false;
-            const prog      = student.progress || 0;
+            const isActive = student.isActive !== false;
+            const prog     = getProgress(student._id);
             return (
               <div key={student._id} className="flex items-center px-5 py-3.5 border-b border-gray-100 gap-3 hover:bg-gray-50 transition-colors">
                 <div className="flex-[2] flex items-center gap-2.5">
@@ -164,7 +201,10 @@ export default function StudentsPage() {
                   <p className="text-[11px] text-gray-400">{student.batch?.name || '—'}</p>
                 </div>
                 <div className="flex-[2]">
-                  <ProgressBar value={prog} />
+                  {progressLoading && progressMap[student._id] === undefined
+                    ? <div className="h-1.5 bg-gray-100 rounded-full animate-pulse w-full" />
+                    : <ProgressBar value={prog} />
+                  }
                 </div>
                 <div className="flex-1">
                   <p className="text-[13px] text-gray-500">

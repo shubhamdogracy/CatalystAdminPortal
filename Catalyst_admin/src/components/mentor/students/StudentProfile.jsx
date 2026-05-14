@@ -1338,8 +1338,8 @@ function SubTopicRow({ subTopic, attempts, onView, viewLoadingId, accentColor = 
 
                 {/* Label + date */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-semibold text-slate-700">
-                    Attempt {i + 1}
+                  <p className="text-[12px] font-semibold text-slate-700 truncate">
+                    {s.practice_config_id?.name || s.exam_config_id?.name || s.full_length_exam_config_id?.name || `Attempt ${i + 1}`}
                     <span className="text-slate-400 font-normal ml-1.5">· {date}</span>
                   </p>
                 </div>
@@ -1703,6 +1703,7 @@ export default function StudentProfile() {
   const [practiceResult, setPracticeResult]               = useState(null);
   const [practiceResultLoading, setPracticeResultLoading] = useState(null);
   const [fullLengthResult, setFullLengthResult]           = useState(null);
+  const [studentAssignments, setStudentAssignments]       = useState([]);
 
   useEffect(() => {
     studentService.getById(id)
@@ -1714,9 +1715,14 @@ export default function StudentProfile() {
     Promise.all([
       satMentorService.getStudentSessions(id).catch(err => { console.error('[SAT] Failed to load adaptive sessions:', err?.message || err); return { data: [] }; }),
       satMentorService.getStudentPracticeSessions(id).catch(err => { console.error('[SAT] Failed to load practice sessions:', err?.message || err); return { data: [] }; }),
-    ]).then(([adaptiveRes, practiceRes]) => {
+      satMentorService.getAssignments().catch(() => ({ data: [] })),
+    ]).then(([adaptiveRes, practiceRes, assignRes]) => {
       setAdaptiveSessions(adaptiveRes.data || []);
       setPracticeSessions(practiceRes.data || []);
+      const allAssign = assignRes.data || [];
+      setStudentAssignments(allAssign.filter(a =>
+        (a.student_id?._id?.toString() || a.student_id?.toString()) === id
+      ));
       setSatSessionsLoading(false);
     });
   }, [id]);
@@ -1777,8 +1783,6 @@ export default function StudentProfile() {
     );
   }
 
-  const prog          = student.progress || 0;
-  const progressColor = prog >= 80 ? '#10b981' : prog >= 50 ? '#f59e0b' : '#ef4444';
   const isActive      = student.isActive !== false;
   const batch         = student.batches?.[0];
   const mentor        = batch?.mentorId;
@@ -1794,7 +1798,26 @@ export default function StudentProfile() {
   const mockSessions = adaptiveSessions.filter(s =>
     s.exam_config_id?.type === 'mock' || (s.exam_config_id && !s.exam_config_id.type)
   );
-  const totalTests         = adaptiveSessions.length + practiceSessions.length;
+  const totalTests = adaptiveSessions.length + practiceSessions.length;
+
+  // Per-category score averages (only completed sessions)
+  const avgPct = (sessions) => {
+    const done = sessions.filter(s => s.status === 'complete' || s.status === 'completed');
+    if (done.length === 0) return null;
+    const sum = done.reduce((acc, s) => acc + (s.percentage ?? s.total_percentage ?? 0), 0);
+    return Math.round(sum / done.length);
+  };
+  const diagnosticPct = avgPct(diagnosticSessions);
+  const mockPct       = avgPct(mockSessions);
+  const practicePct   = avgPct(practiceSessions);
+
+  // Overall progress = average of categories that have data
+  const categoryPcts = [diagnosticPct, mockPct, practicePct].filter(v => v !== null);
+  const prog         = categoryPcts.length > 0
+    ? Math.round(categoryPcts.reduce((a, b) => a + b, 0) / categoryPcts.length)
+    : 0;
+  const progressColor = prog >= 80 ? '#10b981' : prog >= 50 ? '#f59e0b' : '#ef4444';
+
 
   const addNote = () => {
     if (newNote.trim()) {
@@ -1844,12 +1867,10 @@ export default function StudentProfile() {
       {/* Quick stats */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: 'Sessions Done',   value: sessionsDone,  color: '#0d9488' },
-          { label: 'Total Sessions',  value: totalSess,     color: '#7c3aed' },
-          { label: 'Tests Taken', value: totalTests > 0 ? totalTests : '—', color: '#f59e0b' },
-          { label: 'Enrolled', value: student.enrollmentDate
-              ? new Date(student.enrollmentDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
-              : '—', color: '#10b981' },
+          { label: 'Tests Taken',      value: totalTests > 0 ? totalTests : '—', color: '#6366f1' },
+          { label: 'Diagnostic Avg',   value: diagnosticPct !== null ? `${diagnosticPct}%` : '—', color: '#0891b2' },
+          { label: 'Mock Avg',         value: mockPct !== null ? `${mockPct}%` : '—',             color: '#7c3aed' },
+          { label: 'Practice Avg',     value: practicePct !== null ? `${practicePct}%` : '—',     color: '#10b981' },
         ].map(stat => (
           <div key={stat.label} className="bg-white rounded-xl px-5 py-4 border border-gray-200 text-center">
             <p className="text-xl font-extrabold" style={{ color: stat.color }}>{stat.value}</p>
@@ -1912,7 +1933,6 @@ export default function StudentProfile() {
 
         {/* ── Progress ── */}
         {activeTab === 'Progress' && (() => {
-          const sessPct = totalSess ? Math.round((sessionsDone / totalSess) * 100) : 0;
           const statusLabel = prog >= 80 ? 'Excellent' : prog >= 50 ? 'On Track' : 'Needs Focus';
           const statusColor = prog >= 80 ? '#10b981'   : prog >= 50 ? '#f59e0b'  : '#ef4444';
 
@@ -1976,20 +1996,30 @@ export default function StudentProfile() {
                     <p className="text-indigo-300 text-[11px] mt-0.5">Overall completion across all activities</p>
                     <div className="flex items-center gap-4 mt-3 flex-wrap">
                       <div>
-                        <p className="text-white font-extrabold text-sm leading-tight">
-                          {sessionsDone}<span className="text-indigo-300 font-normal text-[11px]">/{totalSess}</span>
-                        </p>
-                        <p className="text-indigo-300 text-[10px]">Sessions</p>
+                        <p className="text-white font-extrabold text-sm leading-tight">{totalTests}</p>
+                        <p className="text-indigo-300 text-[10px]">Tests Taken</p>
                       </div>
-                      {batch && (
-                        <>
-                          <div className="w-px h-7 bg-white/15" />
-                          <div>
-                            <p className="text-white font-extrabold text-sm leading-tight">{batchPct}%</p>
-                            <p className="text-indigo-300 text-[10px]">Batch</p>
-                          </div>
-                        </>
-                      )}
+                      {diagnosticPct !== null && (<>
+                        <div className="w-px h-7 bg-white/15" />
+                        <div>
+                          <p className="text-white font-extrabold text-sm leading-tight">{diagnosticPct}%</p>
+                          <p className="text-indigo-300 text-[10px]">Diagnostic</p>
+                        </div>
+                      </>)}
+                      {mockPct !== null && (<>
+                        <div className="w-px h-7 bg-white/15" />
+                        <div>
+                          <p className="text-white font-extrabold text-sm leading-tight">{mockPct}%</p>
+                          <p className="text-indigo-300 text-[10px]">Mock</p>
+                        </div>
+                      </>)}
+                      {practicePct !== null && (<>
+                        <div className="w-px h-7 bg-white/15" />
+                        <div>
+                          <p className="text-white font-extrabold text-sm leading-tight">{practicePct}%</p>
+                          <p className="text-indigo-300 text-[10px]">Practice</p>
+                        </div>
+                      </>)}
                       <div className="w-px h-7 bg-white/15" />
                       <div>
                         <p className="text-sm font-extrabold leading-tight" style={{ color: statusColor }}>{statusLabel}</p>
@@ -2005,15 +2035,27 @@ export default function StudentProfile() {
                 {/* ── Progress tracks ── */}
                 <div className="flex flex-col gap-2.5">
                   <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-[1.5px]">Progress Breakdown</p>
-                  <ProgressTrack label="Overall Progress" pct={prog}
-                    gradient="linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa)" icon="📈" />
-                  <ProgressTrack label="Personal Sessions" pct={sessPct}
-                    gradient="linear-gradient(90deg,#0891b2,#06b6d4,#22d3ee)"
-                    note={`${sessionsDone} / ${totalSess}`} icon="🎯" />
-                  {batch && (
-                    <ProgressTrack label={`Batch · ${batch.name}`} pct={batchPct}
+                  <ProgressTrack label="Overall Average" pct={prog}
+                    gradient="linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa)"
+                    note={`avg of ${categoryPcts.length} categor${categoryPcts.length === 1 ? 'y' : 'ies'}`}
+                    icon="📈" />
+                  {diagnosticPct !== null && (
+                    <ProgressTrack label="Diagnostic Tests" pct={diagnosticPct}
+                      gradient="linear-gradient(90deg,#0891b2,#06b6d4,#22d3ee)"
+                      note={`${diagnosticSessions.filter(s => s.status === 'complete' || s.status === 'completed').length} completed`}
+                      icon="🔬" />
+                  )}
+                  {mockPct !== null && (
+                    <ProgressTrack label="Mock Tests" pct={mockPct}
                       gradient="linear-gradient(90deg,#7c3aed,#a855f7,#c084fc)"
-                      note={`${batch.completedSessions || 0} / ${batch.totalSessions}`} icon="👥" />
+                      note={`${mockSessions.filter(s => s.status === 'complete' || s.status === 'completed').length} completed`}
+                      icon="📝" />
+                  )}
+                  {practicePct !== null && (
+                    <ProgressTrack label="Practice Tests" pct={practicePct}
+                      gradient="linear-gradient(90deg,#059669,#10b981,#34d399)"
+                      note={`${practiceSessions.filter(s => s.status === 'complete' || s.status === 'completed').length} completed`}
+                      icon="📚" />
                   )}
                 </div>
 

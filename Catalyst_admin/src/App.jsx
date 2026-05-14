@@ -34,6 +34,7 @@ import MentorDetailPage   from './components/operations/mentors/MentorDetailPage
 import AddMentorPage      from './components/operations/mentors/AddMentorPage';
 import OpsStudentsPage    from './components/operations/students/OpsStudentsPage';
 import AddStudentPage     from './components/operations/students/AddStudentPage';
+import OpsStudentProfile  from './components/mentor/students/StudentProfile';
 import BatchesPage            from './components/operations/batches/BatchesPage';
 import BatchDetailPage        from './components/operations/batches/BatchDetailPage';
 import OpsNotificationsPage    from './components/operations/notifications/OpsNotificationsPage';
@@ -92,6 +93,7 @@ export default function App() {
                             <Route path="mentors/:id"   element={<MentorDetailPage />} />
                             <Route path="students"      element={<OpsStudentsPage />} />
                             <Route path="students/add"  element={<AddStudentPage />} />
+                            <Route path="students/:id"  element={<OpsStudentProfile />} />
                             <Route path="batches"       element={<BatchesPage />} />
                             <Route path="batches/:id"   element={<BatchDetailPage />} />
                             <Route path="sat-tests/diagnostic"     element={<DiagnosticTestsPage />} />
