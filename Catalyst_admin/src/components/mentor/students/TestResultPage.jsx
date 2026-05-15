@@ -1037,9 +1037,9 @@ function PracticeResultView({ session, config }) {
 
       {config && (
         <div className="flex items-center gap-4 px-6 py-2 bg-teal-50 border-b border-teal-100 text-xs text-teal-700 flex-wrap">
+          {config.subject   && <span>Subject: <strong>{SUBJ_LABEL[config.subject] || config.subject}</strong></span>}
           {config.topic     && <span>Topic: <strong>{config.topic}</strong></span>}
           {config.sub_topic && <span>Sub-topic: <strong>{config.sub_topic}</strong></span>}
-          {config.subject   && <span>Subject: <strong>{SUBJ_LABEL[config.subject] || config.subject}</strong></span>}
         </div>
       )}
 
