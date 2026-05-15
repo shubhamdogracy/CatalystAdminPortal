@@ -684,7 +684,7 @@ const SERIES_RE = / — (Math|Reading & Writing)$/;
 const scoreColor = pct => pct >= 80 ? '#059669' : pct >= 60 ? '#0891b2' : pct >= 40 ? '#d97706' : '#dc2626';
 const scoreBg    = pct => pct >= 80 ? '#ecfdf5' : pct >= 60 ? '#ecfeff' : pct >= 40 ? '#fffbeb' : '#fef2f2';
 
-function SatTestSection({ label, icon, accentColor, sessions, loading, onView, onViewSeries, testType, viewLoadingId }) {
+function SatTestSection({ label, icon, accentColor, sessions, loading, onView, onViewSeries, testType, viewLoadingId, onInsights }) {
   const [expanded, setExpanded] = useState(false);
 
   const displayRows = useMemo(() => {
@@ -751,9 +751,12 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, o
          }}>
 
       {/* ── Header ── */}
-      <button
+      <div
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center gap-4 px-5 py-4 text-left transition-colors"
+        role="button"
+        tabIndex={0}
+        onKeyDown={e => e.key === 'Enter' && setExpanded(p => !p)}
+        className="w-full flex items-center gap-4 px-5 py-4 cursor-pointer select-none transition-colors"
         style={{ background: expanded ? `linear-gradient(135deg,${accentColor}0c,white 65%)` : 'white' }}>
 
         {/* Gradient icon box */}
@@ -795,6 +798,17 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, o
 
         {/* Circular progress ring + chevron */}
         <div className="flex items-center gap-3 shrink-0">
+          {!loading && sessions.length > 0 && onInsights && (
+            <button
+              onClick={e => { e.stopPropagation(); onInsights(testType); }}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all hover:opacity-90 active:scale-95 shrink-0"
+              style={{ background: `${accentColor}14`, color: accentColor, border: `1px solid ${accentColor}30` }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+              Insights
+            </button>
+          )}
           {!loading && sessions.length > 0 && (
             <div className="relative w-12 h-12">
               <svg viewBox="0 0 36 36" className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
@@ -819,7 +833,7 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, o
             </svg>
           </div>
         </div>
-      </button>
+      </div>
 
       {/* ── Expanded body ── */}
       {expanded && (
@@ -1936,6 +1950,10 @@ export default function StudentProfile() {
     });
   };
 
+  const handleInsights = (testType) => {
+    navigate(`${basePath}/students/${id}/insights/${testType}`);
+  };
+
   if (loading) {
     return (
       <div className="p-6 flex flex-col gap-4">
@@ -2524,6 +2542,7 @@ export default function StudentProfile() {
                     onViewSeries={handleViewSeriesResult}
                     testType="diagnostic"
                     viewLoadingId={null}
+                    onInsights={handleInsights}
                   />
                   <SatTestSection
                     label="Mock Tests"
@@ -2535,6 +2554,7 @@ export default function StudentProfile() {
                     onViewSeries={handleViewSeriesResult}
                     testType="mock"
                     viewLoadingId={null}
+                    onInsights={handleInsights}
                   />
                   <PracticeHistorySection
                     sessions={practiceSessions}

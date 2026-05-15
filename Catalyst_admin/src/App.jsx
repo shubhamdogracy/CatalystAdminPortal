@@ -19,6 +19,7 @@ import MentorDashboard    from './components/mentor/dashboard/MentorDashboard';
 import StudentsPage       from './components/mentor/students/StudentsPage';
 import StudentProfile     from './components/mentor/students/StudentProfile';
 import TestResultPage     from './components/mentor/students/TestResultPage';
+import InsightsPage       from './components/mentor/students/InsightsPage';
 import SlotsPage          from './components/mentor/slots/SlotsPage';
 import SessionsPage       from './components/mentor/sessions/SessionsPage';
 import AnalyticsPage      from './components/mentor/analytics/AnalyticsPage';
@@ -69,6 +70,7 @@ export default function App() {
                             <Route path="students"      element={<StudentsPage />} />
                             <Route path="students/:id"  element={<StudentProfile />} />
                             <Route path="students/:studentId/result/:sessionId" element={<TestResultPage />} />
+                            <Route path="students/:studentId/insights/:testType" element={<InsightsPage />} />
                             <Route path="slots"         element={<SlotsPage />} />
                             <Route path="sessions"      element={<SessionsPage />} />
                             <Route path="analytics"     element={<AnalyticsPage />} />
@@ -97,6 +99,7 @@ export default function App() {
                             <Route path="students/add"  element={<AddStudentPage />} />
                             <Route path="students/:id"  element={<OpsStudentProfile />} />
                             <Route path="students/:studentId/result/:sessionId" element={<TestResultPage />} />
+                            <Route path="students/:studentId/insights/:testType" element={<InsightsPage />} />
                             <Route path="batches"       element={<BatchesPage />} />
                             <Route path="batches/:id"   element={<BatchDetailPage />} />
                             <Route path="sat-tests/diagnostic"     element={<DiagnosticTestsPage />} />
