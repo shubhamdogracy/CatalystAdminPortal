@@ -19,7 +19,9 @@ function computeTestProgress(adaptiveSessions, practiceSessions) {
 
 const inputClass = 'px-3 py-2 rounded-lg border-[1.5px] border-gray-200 text-[13px] outline-none bg-white text-gray-700';
 
-function GrantAccessModal({ student, onConfirm, onClose, loading }) {
+function GrantAccessModal({ student, mentors, selectedMentorId, onMentorChange, selectedSubject, onSubjectChange, onConfirm, onClose, loading }) {
+  const selectedMentor = mentors.find(m => m._id === selectedMentorId);
+
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
@@ -35,6 +37,49 @@ function GrantAccessModal({ student, onConfirm, onClose, loading }) {
             Make sure payment has been confirmed before granting access.
           </p>
         </div>
+        <div className="px-6 py-4 border-b border-gray-100 flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[12px] font-semibold text-gray-700">
+              Assign Mentor <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <select
+              className={`${inputClass} w-full`}
+              value={selectedMentorId}
+              onChange={e => { onMentorChange(e.target.value); if (!e.target.value) onSubjectChange(''); }}
+            >
+              <option value="">Select a mentor...</option>
+              {mentors.map(m => (
+                <option key={m._id} value={m._id}>{m.name}{m.specialization ? ` — ${m.specialization}` : ''}</option>
+              ))}
+            </select>
+          </div>
+
+          {selectedMentorId && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[12px] font-semibold text-gray-700">
+                Subject <span className="text-red-400">*</span>
+              </label>
+              <select
+                className={`${inputClass} w-full`}
+                value={selectedSubject}
+                onChange={e => onSubjectChange(e.target.value)}
+              >
+                <option value="">Select subject...</option>
+                <option value="maths">Maths</option>
+                <option value="english">English</option>
+              </select>
+            </div>
+          )}
+
+          {selectedMentor && (
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-ops-primary to-purple-400 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+                {selectedMentor.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+              </div>
+              <span className="text-[12px] text-gray-600">{selectedMentor.name} will be assigned to this student</span>
+            </div>
+          )}
+        </div>
         <div className="flex gap-2.5 px-6 py-4">
           <button
             onClick={onClose}
@@ -44,7 +89,7 @@ function GrantAccessModal({ student, onConfirm, onClose, loading }) {
           </button>
           <button
             onClick={onConfirm}
-            disabled={loading}
+            disabled={loading || (!!selectedMentorId && !selectedSubject)}
             className="flex-1 py-2 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 transition-colors"
           >
             {loading ? 'Granting…' : 'Grant Access'}
@@ -64,6 +109,8 @@ export default function OpsStudentsPage() {
   const [progressLoading, setProgressLoading] = useState(false);
   const [error, setError]               = useState('');
   const [grantTarget, setGrantTarget]   = useState(null);
+  const [grantMentorId, setGrantMentorId] = useState('');
+  const [grantSubject, setGrantSubject] = useState('');
   const [grantLoading, setGrantLoading] = useState(false);
 
   const [search, setSearch]             = useState('');
@@ -135,8 +182,10 @@ export default function OpsStudentsPage() {
     if (!grantTarget) return;
     setGrantLoading(true);
     try {
-      await studentService.grantAccess(grantTarget._id);
+      await studentService.grantAccess(grantTarget._id, grantMentorId || null, grantSubject || null);
       setGrantTarget(null);
+      setGrantMentorId('');
+      setGrantSubject('');
       setLoading(true);
       loadStudents();
     } catch (e) {
@@ -151,8 +200,13 @@ export default function OpsStudentsPage() {
       {grantTarget && (
         <GrantAccessModal
           student={grantTarget}
+          mentors={mentors}
+          selectedMentorId={grantMentorId}
+          onMentorChange={setGrantMentorId}
+          selectedSubject={grantSubject}
+          onSubjectChange={setGrantSubject}
           onConfirm={handleGrantAccess}
-          onClose={() => setGrantTarget(null)}
+          onClose={() => { setGrantTarget(null); setGrantMentorId(''); setGrantSubject(''); }}
           loading={grantLoading}
         />
       )}
