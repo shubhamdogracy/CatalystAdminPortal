@@ -112,6 +112,157 @@ function QuestionModal({ q, onClose }) {
   );
 }
 
+// ── Edit Question Modal ───────────────────────────────────────────────────────
+function EditQuestionModal({ q, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    stem:           q.stem           || '',
+    option_a:       q.option_a       || '',
+    option_b:       q.option_b       || '',
+    option_c:       q.option_c       || '',
+    option_d:       q.option_d       || '',
+    explanation:    q.explanation    || '',
+    correct_answer: q.correct_answer || 'A',
+    difficulty:     q.difficulty     || 'medium',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState('');
+  const [preview, setPreview] = useState(false);
+
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const handleSave = async () => {
+    if (!form.stem.trim()) { setError('Question stem is required'); return; }
+    setSaving(true); setError('');
+    try {
+      await satAdminService.updateQuestion(q._id, form);
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(e.message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const labelCls = 'text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 block';
+  const areaCls  = 'w-full rounded-[10px] border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:border-ops-primary resize-none bg-white';
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-[18px] shadow-[0_20px_60px_rgba(0,0,0,0.25)] w-full max-w-3xl max-h-[92vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+          <div className="flex items-center gap-3">
+            <h3 className="text-base font-bold text-gray-900">Edit Question</h3>
+            <button
+              onClick={() => setPreview(p => !p)}
+              className={`px-3 py-1 rounded-[8px] text-xs font-semibold transition-colors border ${
+                preview ? 'bg-ops-primary text-white border-ops-primary' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {preview ? 'Edit Mode' : 'Preview'}
+            </button>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 shrink-0">✕</button>
+        </div>
+
+        <div className="px-6 py-5 flex flex-col gap-5">
+          {preview ? (
+            /* ── Preview pane ── */
+            <div className="flex flex-col gap-4">
+              <div>
+                <p className={labelCls}>Question Stem</p>
+                <div className="border border-gray-200 rounded-[10px] p-3 bg-gray-50">
+                  <MathContent html={form.stem} className="text-gray-900 text-sm leading-relaxed [&_p]:mb-2" />
+                </div>
+              </div>
+              {q.format !== 'grid_in' && (
+                <div>
+                  <p className={labelCls}>Options</p>
+                  <div className="flex flex-col gap-2">
+                    {['A', 'B', 'C', 'D'].map(k => {
+                      const val = form[`option_${k.toLowerCase()}`];
+                      if (!val) return null;
+                      const isCorrect = form.correct_answer?.toUpperCase() === k;
+                      return (
+                        <div key={k} className={`flex items-start gap-3 px-3 py-2 rounded-[10px] border text-sm ${isCorrect ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}`}>
+                          <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isCorrect ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>{k}</span>
+                          <MathContent html={val} className="[&_p]:m-0 text-gray-800" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {form.explanation && (
+                <div>
+                  <p className={labelCls}>Explanation</p>
+                  <div className="border border-gray-200 rounded-[10px] p-3 bg-gray-50">
+                    <MathContent html={form.explanation} className="text-gray-700 text-sm leading-relaxed [&_p]:mb-2" />
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── Edit pane ── */
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className={labelCls}>Question Stem</label>
+                <textarea rows={4} className={areaCls} value={form.stem} onChange={set('stem')} placeholder="Enter question stem (supports $LaTeX$ and HTML)" />
+              </div>
+
+              {q.format !== 'grid_in' && (
+                <div className="grid grid-cols-2 gap-3">
+                  {['A', 'B', 'C', 'D'].map(k => (
+                    <div key={k}>
+                      <label className={labelCls}>Option {k}</label>
+                      <textarea rows={2} className={areaCls} value={form[`option_${k.toLowerCase()}`]} onChange={set(`option_${k.toLowerCase()}`)} placeholder={`Option ${k}`} />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Correct Answer</label>
+                  <select className="h-9 px-3 rounded-[10px] border border-gray-200 text-sm focus:outline-none focus:border-ops-primary w-full bg-white" value={form.correct_answer} onChange={set('correct_answer')}>
+                    {(q.format === 'grid_in' ? [] : ['A', 'B', 'C', 'D']).map(k => <option key={k} value={k}>{k}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Difficulty</label>
+                  <select className="h-9 px-3 rounded-[10px] border border-gray-200 text-sm focus:outline-none focus:border-ops-primary w-full bg-white" value={form.difficulty} onChange={set('difficulty')}>
+                    {['easy', 'medium', 'hard'].map(d => <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className={labelCls}>Explanation (optional)</label>
+                <textarea rows={3} className={areaCls} value={form.explanation} onChange={set('explanation')} placeholder="Explanation (supports $LaTeX$ and HTML)" />
+              </div>
+
+              <p className="text-xs text-gray-400">Use <code className="bg-gray-100 px-1 rounded">$...$</code> for inline math and <code className="bg-gray-100 px-1 rounded">$$...$$</code> for display math.</p>
+            </div>
+          )}
+
+          {error && <p className="text-sm text-red-500 bg-red-50 rounded-[10px] px-3 py-2">{error}</p>}
+
+          <div className="flex gap-3 justify-end border-t border-gray-100 pt-4">
+            <button onClick={onClose} className="px-4 py-2 rounded-[10px] border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="px-5 py-2 rounded-[10px] bg-ops-primary text-white text-sm font-semibold hover:bg-violet-700 disabled:opacity-50 transition-colors">
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Upload Modal ──────────────────────────────────────────────────────────────
 function UploadModal({ onClose, onDone }) {
   const [file, setFile]       = useState(null);
@@ -215,6 +366,7 @@ export default function SatQuestionBankPage() {
   const [loading, setLoading]       = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [selected, setSelected]     = useState(null);
+  const [editing, setEditing]       = useState(null);
 
   const [filters, setFilters] = useState({ subject: '', topic: '', sub_topic: '', question_id: '' });
   const LIMIT = 20;
@@ -406,12 +558,20 @@ export default function SatQuestionBankPage() {
                   <td className="px-4 py-3 text-gray-600 text-xs">{q.topic}</td>
                   <td className="px-4 py-3 text-gray-600 text-xs">{q.sub_topic}</td>
                   <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleDeactivate(q._id)}
-                      className="px-3 py-1 rounded-[8px] text-xs text-red-500 border border-red-200 hover:bg-red-50 transition-colors"
-                    >
-                      Deactivate
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setEditing(q)}
+                        className="px-3 py-1 rounded-[8px] text-xs text-ops-primary border border-ops-primary/30 hover:bg-ops-lighter transition-colors"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeactivate(q._id)}
+                        className="px-3 py-1 rounded-[8px] text-xs text-red-500 border border-red-200 hover:bg-red-50 transition-colors"
+                      >
+                        Deactivate
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -494,6 +654,13 @@ export default function SatQuestionBankPage() {
       )}
 
       {selected && <QuestionModal q={selected} onClose={() => setSelected(null)} />}
+      {editing && (
+        <EditQuestionModal
+          q={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { loadQuestions(); loadStats(); }}
+        />
+      )}
     </div>
   );
 }
