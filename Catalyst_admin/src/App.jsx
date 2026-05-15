@@ -18,6 +18,7 @@ import MentorLayout       from './components/mentor/MentorLayout';
 import MentorDashboard    from './components/mentor/dashboard/MentorDashboard';
 import StudentsPage       from './components/mentor/students/StudentsPage';
 import StudentProfile     from './components/mentor/students/StudentProfile';
+import TestResultPage     from './components/mentor/students/TestResultPage';
 import SlotsPage          from './components/mentor/slots/SlotsPage';
 import SessionsPage       from './components/mentor/sessions/SessionsPage';
 import AnalyticsPage      from './components/mentor/analytics/AnalyticsPage';
@@ -67,6 +68,7 @@ export default function App() {
                             <Route path="dashboard"     element={<MentorDashboard />} />
                             <Route path="students"      element={<StudentsPage />} />
                             <Route path="students/:id"  element={<StudentProfile />} />
+                            <Route path="students/:studentId/result/:sessionId" element={<TestResultPage />} />
                             <Route path="slots"         element={<SlotsPage />} />
                             <Route path="sessions"      element={<SessionsPage />} />
                             <Route path="analytics"     element={<AnalyticsPage />} />
@@ -94,6 +96,7 @@ export default function App() {
                             <Route path="students"      element={<OpsStudentsPage />} />
                             <Route path="students/add"  element={<AddStudentPage />} />
                             <Route path="students/:id"  element={<OpsStudentProfile />} />
+                            <Route path="students/:studentId/result/:sessionId" element={<TestResultPage />} />
                             <Route path="batches"       element={<BatchesPage />} />
                             <Route path="batches/:id"   element={<BatchDetailPage />} />
                             <Route path="sat-tests/diagnostic"     element={<DiagnosticTestsPage />} />

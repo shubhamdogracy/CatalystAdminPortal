@@ -458,33 +458,6 @@ export default function MentorDashboard() {
             )}
           </div>
 
-          {/* Quick Access */}
-          <div className="rounded-2xl p-4"
-               style={{ background: `linear-gradient(135deg, ${P.bannerFrom}, ${P.bannerTo})` }}>
-            <p className="text-[10px] font-bold uppercase tracking-[1.5px] mb-3 text-white/60">
-              Quick Access
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'Students', icon: '👥', path: '/mentor/students' },
-                { label: 'Messages', icon: '💬', path: '/mentor/communication' },
-                { label: 'Profile',  icon: '👤', path: '/mentor/profile' },
-              ].map(q => (
-                <button
-                  key={q.path}
-                  className="py-3.5 rounded-xl flex flex-col items-center gap-1.5 transition-all hover:scale-105"
-                  style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.22)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
-                  onClick={() => navigate(q.path)}
-                >
-                  <span className="text-xl">{q.icon}</span>
-                  <span className="text-[11px] font-semibold text-white/80">{q.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
         </div>
       </div>
     </div>
