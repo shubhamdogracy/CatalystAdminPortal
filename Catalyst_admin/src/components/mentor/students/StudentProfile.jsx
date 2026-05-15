@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { studentService, satMentorService } from '../../../services/api';
 import MathContent from '../../common/MathContent';
 import {
@@ -31,6 +31,14 @@ function sanitizeText(text) {
     .replace(//g, '“').replace(//g, '”')
     .replace(//g, '–').replace(//g, '—')
     .replace(/�/g, "'").replace(/◆/g, "'");
+}
+
+function boldChoiceLabels(html) {
+  if (!html) return html;
+  return html.replace(
+    /(Choice\s+[A-D]\s+is\s+(?:the\s+best\s+answer|correct|incorrect)\.?)/gi,
+    '<strong>$1</strong>',
+  );
 }
 
 function getMasteryLevel(pct) {
@@ -597,7 +605,7 @@ function SatScoreModal({ session, assignment, onClose }) {
                           <span className="text-base shrink-0">💡</span>
                           <div>
                             <p className="text-[11px] font-extrabold text-amber-700 uppercase tracking-wide mb-1">Explanation</p>
-                            <MathContent html={sanitizeText(q.explanation)} className="text-[12px] text-amber-800 leading-relaxed [&_p]:m-0" />
+                            <MathContent html={boldChoiceLabels(sanitizeText(q.explanation))} className="text-[12px] text-amber-800 leading-relaxed [&_p]:m-0" />
                           </div>
                         </div>
                       </div>
@@ -676,7 +684,7 @@ const SERIES_RE = / — (Math|Reading & Writing)$/;
 const scoreColor = pct => pct >= 80 ? '#059669' : pct >= 60 ? '#0891b2' : pct >= 40 ? '#d97706' : '#dc2626';
 const scoreBg    = pct => pct >= 80 ? '#ecfdf5' : pct >= 60 ? '#ecfeff' : pct >= 40 ? '#fffbeb' : '#fef2f2';
 
-function SatTestSection({ label, icon, accentColor, sessions, loading, onView, viewLoadingId }) {
+function SatTestSection({ label, icon, accentColor, sessions, loading, onView, onViewSeries, testType, viewLoadingId }) {
   const [expanded, setExpanded] = useState(false);
   const completed = sessions.filter(s => s.status === 'complete' || s.status === 'completed').length;
 
@@ -718,77 +726,115 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, v
     ? new Date(raw).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
     : '';
 
-  const ViewBtn = ({ s }) => {
-    const isDone = s.status === 'complete' || s.status === 'completed';
-    if (!isDone) return (
-      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${s.status === 'pending' ? 'bg-slate-100 text-slate-500' : 'bg-amber-100 text-amber-600'}`}>
-        {s.status === 'pending' ? 'Pending' : 'In Progress'}
-      </span>
-    );
-    return (
-      <button onClick={() => onView(s)} disabled={viewLoadingId === s._id}
-        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold text-white disabled:opacity-60 transition-all hover:shadow-sm active:scale-95"
-        style={{ background: 'linear-gradient(135deg,#0d9488,#059669)' }}>
-        {viewLoadingId === s._id
-          ? <span className="w-3 h-3 rounded-full border-2 border-white/40 border-t-white animate-spin inline-block" />
-          : 'View →'}
-      </button>
-    );
-  };
-
   const completionPct = sessions.length > 0 ? Math.round((completed / sessions.length) * 100) : 0;
 
+  // Compute recent avg score for header display
+  const recentScores = sessions
+    .filter(s => s.status === 'complete' || s.status === 'completed')
+    .map(s => s.percentage ?? s.total_percentage ?? null)
+    .filter(v => v !== null)
+    .slice(-5);
+  const avgScore = recentScores.length > 0
+    ? Math.round(recentScores.reduce((a, b) => a + b, 0) / recentScores.length)
+    : null;
+
   return (
-    <div className={`rounded-2xl border overflow-hidden transition-all duration-200 ${expanded ? 'shadow-md' : 'shadow-sm hover:shadow-md'}`}
-         style={{ borderColor: expanded ? `${accentColor}55` : '#e5e7eb' }}>
+    <div className="rounded-2xl overflow-hidden"
+         style={{
+           border: `1.5px solid ${expanded ? accentColor + '50' : '#eef0f4'}`,
+           boxShadow: expanded ? `0 8px 32px ${accentColor}1a` : '0 1px 4px rgba(0,0,0,0.05)',
+           transition: 'box-shadow 0.25s ease, border-color 0.25s ease',
+         }}>
 
       {/* ── Header ── */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-slate-50/70 transition-colors group">
-        <div className="flex items-center gap-3">
-          {/* Icon box */}
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-sm"
-               style={{ background: `linear-gradient(135deg,${accentColor}22,${accentColor}44)`, border: `1.5px solid ${accentColor}33` }}>
-            {icon}
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-800 leading-tight">{label}</p>
-            {!loading && sessions.length > 0 && (
-              <p className="text-[11px] text-slate-400 mt-0.5">{completed} of {sessions.length} completed</p>
-            )}
-          </div>
-          {!loading && sessions.length > 0 && (
-            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full"
-                  style={{ background: `${accentColor}18`, color: accentColor }}>
-              {completionPct}%
-            </span>
-          )}
+        className="w-full flex items-center gap-4 px-5 py-4 text-left transition-colors"
+        style={{ background: expanded ? `linear-gradient(135deg,${accentColor}0c,white 65%)` : 'white' }}>
+
+        {/* Gradient icon box */}
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-[22px] shrink-0"
+             style={{
+               background: `linear-gradient(145deg,${accentColor}28,${accentColor}10)`,
+               border: `1.5px solid ${accentColor}30`,
+               boxShadow: `0 3px 10px ${accentColor}25`,
+             }}>
+          {icon}
         </div>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${expanded ? 'rotate-180' : ''}`}
-             style={{ background: expanded ? `${accentColor}18` : '#f1f5f9' }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-               style={{ color: expanded ? accentColor : '#94a3b8' }}>
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+
+        {/* Title + meta */}
+        <div className="flex-1 min-w-0">
+          <p className="text-[14px] font-bold text-slate-800 tracking-tight">{label}</p>
+          {!loading && sessions.length > 0 ? (
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <div className="flex gap-[4px] items-center">
+                {sessions.slice(0, Math.min(sessions.length, 8)).map((s, i) => {
+                  const done = s.status === 'complete' || s.status === 'completed';
+                  return (
+                    <div key={i} className="w-[6px] h-[6px] rounded-full transition-all"
+                         style={{ background: done ? accentColor : '#e2e8f0' }} />
+                  );
+                })}
+                {sessions.length > 8 && (
+                  <span className="text-[9px] text-slate-300 ml-0.5">+{sessions.length - 8}</span>
+                )}
+              </div>
+              <span className="text-[11px] text-slate-400">{completed}/{sessions.length} completed</span>
+              {avgScore !== null && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: `${accentColor}18`, color: accentColor }}>
+                  avg {avgScore}%
+                </span>
+              )}
+            </div>
+          ) : !loading ? (
+            <p className="text-[11px] text-slate-400 mt-0.5">No tests assigned</p>
+          ) : null}
+        </div>
+
+        {/* Circular progress ring + chevron */}
+        <div className="flex items-center gap-3 shrink-0">
+          {!loading && sessions.length > 0 && (
+            <div className="relative w-12 h-12">
+              <svg viewBox="0 0 36 36" className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx="18" cy="18" r="14" fill="none" stroke="#f1f5f9" strokeWidth="4" />
+                <circle cx="18" cy="18" r="14" fill="none" stroke={accentColor} strokeWidth="4"
+                        pathLength="100"
+                        strokeDasharray={`${completionPct} 100`}
+                        strokeLinecap="round" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[10px] font-extrabold leading-none" style={{ color: accentColor }}>
+                  {completionPct}%
+                </span>
+              </div>
+            </div>
+          )}
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${expanded ? 'rotate-180' : ''}`}
+               style={{ background: expanded ? `${accentColor}18` : '#f3f4f6' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                 style={{ color: expanded ? accentColor : '#94a3b8' }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
         </div>
       </button>
 
-      {/* ── Body ── */}
+      {/* ── Expanded body ── */}
       {expanded && (
-        <div style={{ borderTop: `2px solid ${accentColor}22` }}>
+        <div style={{ borderTop: `1.5px solid ${accentColor}20`, background: 'linear-gradient(to bottom,#f8f9fb,#f5f6f8)' }}>
           {loading ? (
-            <div className="py-10 flex items-center justify-center gap-2.5 text-slate-400 text-sm bg-slate-50/40">
+            <div className="py-10 flex items-center justify-center gap-2.5 text-slate-400 text-sm">
               <span className="w-4 h-4 border-2 border-slate-200 border-t-slate-500 rounded-full animate-spin" />
               Loading sessions…
             </div>
           ) : displayRows.length === 0 ? (
-            <div className="py-12 flex flex-col items-center gap-2 text-slate-400 bg-slate-50/40">
-              <span className="text-3xl opacity-40">{icon}</span>
-              <p className="text-sm">No {label.toLowerCase()} taken yet.</p>
+            <div className="py-10 flex flex-col items-center gap-2 text-slate-400">
+              <span className="text-4xl opacity-20">{icon}</span>
+              <p className="text-sm font-medium">No {label.toLowerCase()} taken yet</p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100 bg-slate-50/30">
+            <div className="p-4 space-y-2.5">
               {displayRows.map((row, idx) => {
 
                 /* ── Full-length or single-subject ── */
@@ -801,33 +847,31 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, v
                   const isDone = s.status === 'complete' || s.status === 'completed';
                   return (
                     <div key={s._id}
-                         className="flex items-center gap-3 px-5 py-3.5 bg-white hover:bg-slate-50 transition-colors">
-                      {/* Index badge */}
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
-                           style={{ background: `${accentColor}18`, color: accentColor }}>
+                         className="flex items-center gap-3 bg-white rounded-xl px-4 py-3.5 border border-slate-100 hover:border-slate-200 hover:shadow-sm transition-all">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-extrabold shrink-0"
+                           style={{ background: `${accentColor}14`, color: accentColor }}>
                         {idx + 1}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-semibold text-slate-800 truncate">{name}</p>
                         <p className="text-[11px] text-slate-400 mt-0.5">{[subj, date].filter(Boolean).join(' · ')}</p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2.5 shrink-0">
                         {pct !== null && (
-                          <span className="text-[12px] font-extrabold px-2 py-0.5 rounded-lg"
-                                style={{ color: scoreColor(pct), background: scoreBg(pct) }}>
-                            {pct}%
-                          </span>
+                          <span className="text-[16px] font-black" style={{ color: scoreColor(pct) }}>{pct}%</span>
                         )}
                         {isDone ? (
-                          <button onClick={() => onView(s)} disabled={viewLoadingId === s._id}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold text-white disabled:opacity-60 transition-all hover:shadow-md active:scale-95"
-                            style={{ background: 'linear-gradient(135deg,#0d9488,#059669)' }}>
+                          <button
+                            onClick={() => onView(s)}
+                            disabled={viewLoadingId === s._id}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold shrink-0 transition-all hover:opacity-90 active:scale-95"
+                            style={{ background: `${accentColor}14`, color: accentColor, border: `1px solid ${accentColor}28` }}>
                             {viewLoadingId === s._id
-                              ? <span className="w-3 h-3 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                              : 'View Results →'}
+                              ? <span className="w-3 h-3 rounded-full border-2 border-current/30 border-t-current animate-spin" />
+                              : 'View →'}
                           </button>
                         ) : (
-                          <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${s.status === 'pending' ? 'bg-slate-100 text-slate-500' : 'bg-amber-100 text-amber-600'}`}>
+                          <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${s.status === 'pending' ? 'bg-slate-100 text-slate-400' : 'bg-amber-100 text-amber-600'}`}>
                             {s.status === 'pending' ? 'Pending' : 'In Progress'}
                           </span>
                         )}
@@ -843,70 +887,82 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, v
                 const mathPct    = latestMath ? (latestMath.total_percentage ?? null) : null;
                 const rwPct      = latestRw   ? (latestRw.total_percentage   ?? null) : null;
                 const date       = fmtDate(latestMath?.createdAt || latestRw?.createdAt);
-                const totalSessions = math.length + rw.length;
+                const mathDone   = latestMath?.status === 'complete' || latestMath?.status === 'completed';
+                const rwDone     = latestRw?.status   === 'complete' || latestRw?.status   === 'completed';
+                const canView    = mathDone || rwDone;
 
                 return (
-                  <div key={series} className="bg-white hover:bg-slate-50/60 transition-colors">
-                    {/* Series header strip */}
-                    <div className="flex items-center justify-between px-5 pt-4 pb-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0"
-                             style={{ background: `${accentColor}18`, border: `1.5px solid ${accentColor}33` }}>
-                          {icon}
-                        </div>
+                  <div key={series} className="bg-white rounded-xl border border-slate-100 overflow-hidden hover:border-slate-200 hover:shadow-sm transition-all">
+                    {/* Series name + date */}
+                    <div className="flex items-center justify-between px-4 py-2.5"
+                         style={{ background: `${accentColor}08`, borderBottom: `1px solid ${accentColor}18` }}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[13px] shrink-0">{icon}</span>
                         <p className="text-[13px] font-bold text-slate-800">{series}</p>
-                        {totalSessions > 2 && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                            {totalSessions} sessions
-                          </span>
-                        )}
                       </div>
-                      {date && <span className="text-[11px] text-slate-400">{date}</span>}
+                      {date && <span className="text-[11px] text-slate-400 shrink-0">{date}</span>}
                     </div>
 
-                    {/* Math + R&W panels */}
-                    <div className="grid grid-cols-2 gap-3 px-5 pb-4">
-                      {/* Math */}
-                      <div className="rounded-xl p-3.5 flex flex-col gap-2" style={{ background: 'linear-gradient(135deg,#faf5ff,#f3e8ff)', border: '1.5px solid #e9d5ff' }}>
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-4 h-4 rounded bg-purple-200 flex items-center justify-center">
-                            <span className="text-[8px] font-black text-purple-700">M</span>
-                          </div>
-                          <p className="text-[10px] font-extrabold text-purple-700 uppercase tracking-wider">Math</p>
+                    {/* Scores row */}
+                    <div className="flex items-center gap-3 px-4 py-3.5">
+                      {/* Math score */}
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                        <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
+                             style={{ background: 'linear-gradient(135deg,#ede9fe,#ddd6fe)', border: '1px solid #c4b5fd40' }}>
+                          <span className="text-[10px] font-black text-purple-700">M</span>
                         </div>
-                        {latestMath ? (
-                          <div className="flex items-center justify-between gap-1 mt-0.5">
-                            {mathPct !== null ? (
-                              <span className="text-[15px] font-black"
-                                    style={{ color: scoreColor(mathPct) }}>{mathPct}%</span>
-                            ) : <span className="text-[11px] text-slate-400">—</span>}
-                            <ViewBtn s={latestMath} />
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-slate-400 italic">Not taken</p>
-                        )}
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-extrabold uppercase tracking-widest text-purple-400 leading-none mb-0.5">Math</p>
+                          {latestMath ? (
+                            mathPct !== null ? (
+                              <p className="text-[20px] font-black leading-tight" style={{ color: scoreColor(mathPct) }}>{mathPct}%</p>
+                            ) : (
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full inline-block ${latestMath.status === 'pending' ? 'bg-slate-100 text-slate-400' : 'bg-amber-100 text-amber-600'}`}>
+                                {latestMath.status === 'pending' ? 'Pending' : 'In Progress'}
+                              </span>
+                            )
+                          ) : <p className="text-[13px] text-slate-300">—</p>}
+                        </div>
                       </div>
 
-                      {/* R&W */}
-                      <div className="rounded-xl p-3.5 flex flex-col gap-2" style={{ background: 'linear-gradient(135deg,#eff6ff,#dbeafe)', border: '1.5px solid #bfdbfe' }}>
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-4 h-4 rounded bg-blue-200 flex items-center justify-center">
-                            <span className="text-[8px] font-black text-blue-700">R</span>
-                          </div>
-                          <p className="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider">R&amp;W</p>
+                      {/* Divider */}
+                      <div className="w-px h-10 bg-slate-100 shrink-0" />
+
+                      {/* R&W score */}
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                        <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
+                             style={{ background: 'linear-gradient(135deg,#e0f2fe,#bae6fd)', border: '1px solid #7dd3fc40' }}>
+                          <span className="text-[10px] font-black text-blue-700">R</span>
                         </div>
-                        {latestRw ? (
-                          <div className="flex items-center justify-between gap-1 mt-0.5">
-                            {rwPct !== null ? (
-                              <span className="text-[15px] font-black"
-                                    style={{ color: scoreColor(rwPct) }}>{rwPct}%</span>
-                            ) : <span className="text-[11px] text-slate-400">—</span>}
-                            <ViewBtn s={latestRw} />
-                          </div>
-                        ) : (
-                          <p className="text-[11px] text-slate-400 italic">Not taken</p>
-                        )}
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-extrabold uppercase tracking-widest text-blue-400 leading-none mb-0.5">R&amp;W</p>
+                          {latestRw ? (
+                            rwPct !== null ? (
+                              <p className="text-[20px] font-black leading-tight" style={{ color: scoreColor(rwPct) }}>{rwPct}%</p>
+                            ) : (
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full inline-block ${latestRw.status === 'pending' ? 'bg-slate-100 text-slate-400' : 'bg-amber-100 text-amber-600'}`}>
+                                {latestRw.status === 'pending' ? 'Pending' : 'In Progress'}
+                              </span>
+                            )
+                          ) : <p className="text-[13px] text-slate-300">—</p>}
+                        </div>
                       </div>
+
+                      {/* View Results button */}
+                      {canView && (
+                        <button
+                          onClick={() => onViewSeries?.({ series, math: mathDone ? latestMath : null, rw: rwDone ? latestRw : null, testType })}
+                          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[12px] font-bold text-white shrink-0 transition-all hover:opacity-90 active:scale-95 ml-1"
+                          style={{
+                            background: `linear-gradient(135deg,${accentColor},${accentColor}bb)`,
+                            boxShadow: `0 3px 10px ${accentColor}35`,
+                          }}>
+                          View Results
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="9 18 15 12 9 6" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -1084,7 +1140,7 @@ function PracticeResultModal({ result, onClose }) {
                           <span className="text-base shrink-0">💡</span>
                           <div>
                             <p className="text-[11px] font-extrabold text-amber-700 uppercase tracking-wide mb-1">Explanation</p>
-                            <MathContent html={sanitizeText(q.explanation)} className="text-[12px] text-amber-800 leading-relaxed [&_p]:m-0" />
+                            <MathContent html={boldChoiceLabels(sanitizeText(q.explanation))} className="text-[12px] text-amber-800 leading-relaxed [&_p]:m-0" />
                           </div>
                         </div>
                       </div>
@@ -1108,6 +1164,105 @@ function PracticeResultModal({ result, onClose }) {
 }
 
 // ── Practice history section — grouped by Subject → Topic → Sub-topic ─────────
+
+function TopicSection({ topic, subTopics, accentColor, onView, viewLoadingId }) {
+  const [open, setOpen] = useState(false);
+  const totalAttempts = Object.values(subTopics).reduce((n, arr) => n + arr.length, 0);
+
+  return (
+    <div style={{ borderTop: '1px solid #f1f5f9' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 px-5 py-2.5 text-left transition-all"
+        style={{
+          background: open ? `${accentColor}0a` : 'white',
+          borderLeft: `3px solid ${open ? accentColor : accentColor + '30'}`,
+        }}>
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          <span className="text-[12px] font-bold text-slate-700">{topic}</span>
+          <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
+            {totalAttempts} attempt{totalAttempts !== 1 ? 's' : ''}
+          </span>
+        </div>
+        <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-200 shrink-0 ${open ? 'rotate-180' : ''}`}
+             style={{ background: open ? `${accentColor}20` : '#f1f5f9' }}>
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+               style={{ color: open ? accentColor : '#94a3b8' }}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
+      </button>
+      {open && (
+        <div style={{ background: `${accentColor}04`, borderTop: `1px solid ${accentColor}15` }}>
+          {Object.entries(subTopics).map(([subTopic, attempts]) => (
+            <SubTopicRow key={subTopic} subTopic={subTopic} attempts={attempts}
+                         onView={onView} viewLoadingId={viewLoadingId} accentColor={accentColor} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubjectSection({ subject, topics, pal, onView, viewLoadingId }) {
+  const [open, setOpen] = useState(false);
+  const totalTopics   = Object.keys(topics).length;
+  const totalAttempts = Object.values(topics).reduce(
+    (n, subTopics) => n + Object.values(subTopics).reduce((m, arr) => m + arr.length, 0), 0,
+  );
+
+  return (
+    <div className="rounded-2xl overflow-hidden"
+         style={{
+           border: `1.5px solid ${open ? pal.from + '45' : '#eef0f4'}`,
+           boxShadow: open ? `0 4px 20px ${pal.from}14` : '0 1px 3px rgba(0,0,0,0.04)',
+           transition: 'all 0.2s ease',
+         }}>
+      {/* Subject header */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left transition-colors"
+        style={{ background: open ? `linear-gradient(135deg,${pal.from}10,white 70%)` : 'white' }}>
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+             style={{
+               background: `linear-gradient(145deg,${pal.from}28,${pal.from}10)`,
+               border: `1.5px solid ${pal.from}35`,
+               boxShadow: `0 2px 8px ${pal.from}22`,
+             }}>
+          <span className="text-[14px] font-black" style={{ color: pal.text }}>
+            {subject === 'math' ? 'M' : subject === 'reading_writing' ? 'R' : 'G'}
+          </span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[14px] font-bold tracking-tight" style={{ color: pal.text }}>
+            {SUBJ_LABEL[subject] || subject}
+          </p>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            {totalTopics} topic{totalTopics !== 1 ? 's' : ''} · {totalAttempts} attempt{totalAttempts !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-250 shrink-0 ${open ? 'rotate-180' : ''}`}
+             style={{ background: open ? `${pal.from}20` : '#f3f4f6' }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+               style={{ color: open ? pal.from : '#94a3b8' }}>
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </div>
+      </button>
+
+      {/* Topics - only when open */}
+      {open && (
+        <div style={{ borderTop: `1.5px solid ${pal.from}25`, background: 'white' }}>
+          {Object.entries(topics).map(([topic, subTopics]) => (
+            <TopicSection key={topic} topic={topic} subTopics={subTopics}
+                          accentColor={pal.from} onView={onView} viewLoadingId={viewLoadingId} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PracticeHistorySection({ sessions, loading, onView, viewLoadingId }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -1137,98 +1292,125 @@ function PracticeHistorySection({ sessions, loading, onView, viewLoadingId }) {
   const completedCount = sessions.filter(s => s.status === 'complete').length;
   const hasData        = Object.keys(groups).length > 0;
   const completionPct  = sessions.length > 0 ? Math.round((completedCount / sessions.length) * 100) : 0;
+  const accentColor    = '#059669';
 
-  // Subject palette
   const SUBJ_PALETTE = {
     math:            { from: '#7c3aed', to: '#6d28d9', light: '#f5f3ff', badge: '#ede9fe', text: '#6d28d9' },
     reading_writing: { from: '#0891b2', to: '#0e7490', light: '#ecfeff', badge: '#cffafe', text: '#0891b2' },
     general:         { from: '#475569', to: '#334155', light: '#f8fafc', badge: '#e2e8f0', text: '#475569' },
   };
 
+  const recentScores = sessions
+    .filter(s => s.status === 'complete')
+    .map(s => s.percentage ?? null)
+    .filter(v => v !== null)
+    .slice(-5);
+  const avgScore = recentScores.length > 0
+    ? Math.round(recentScores.reduce((a, b) => a + b, 0) / recentScores.length)
+    : null;
+
   return (
-    <div className={`rounded-2xl border overflow-hidden transition-all duration-200 ${expanded ? 'shadow-md border-emerald-300' : 'shadow-sm hover:shadow-md border-gray-200'}`}>
+    <div className="rounded-2xl overflow-hidden"
+         style={{
+           border: `1.5px solid ${expanded ? accentColor + '50' : '#eef0f4'}`,
+           boxShadow: expanded ? `0 8px 32px ${accentColor}1a` : '0 1px 4px rgba(0,0,0,0.05)',
+           transition: 'box-shadow 0.25s ease, border-color 0.25s ease',
+         }}>
 
       {/* ── Header ── */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-emerald-50/40 transition-colors">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-sm"
-               style={{ background: 'linear-gradient(135deg,#d1fae522,#6ee7b744)', border: '1.5px solid #6ee7b755' }}>
-            📚
-          </div>
-          <div>
-            <p className="text-sm font-bold text-slate-800 leading-tight">Practice Tests</p>
-            {!loading && sessions.length > 0 && (
-              <p className="text-[11px] text-slate-400 mt-0.5">{completedCount} of {sessions.length} completed</p>
-            )}
-          </div>
-          {!loading && sessions.length > 0 && (
-            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-              {completionPct}%
-            </span>
-          )}
+        className="w-full flex items-center gap-4 px-5 py-4 text-left transition-colors"
+        style={{ background: expanded ? `linear-gradient(135deg,${accentColor}0c,white 65%)` : 'white' }}>
+
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-[22px] shrink-0"
+             style={{
+               background: `linear-gradient(145deg,${accentColor}28,${accentColor}10)`,
+               border: `1.5px solid ${accentColor}30`,
+               boxShadow: `0 3px 10px ${accentColor}25`,
+             }}>
+          📚
         </div>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${expanded ? 'rotate-180 bg-emerald-100' : 'bg-slate-100'}`}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-               className={expanded ? 'text-emerald-600' : 'text-slate-400'}>
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
+
+        <div className="flex-1 min-w-0">
+          <p className="text-[14px] font-bold text-slate-800 tracking-tight">Practice Tests</p>
+          {!loading && sessions.length > 0 ? (
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <div className="flex gap-[4px] items-center">
+                {sessions.slice(0, Math.min(sessions.length, 8)).map((s, i) => {
+                  const done = s.status === 'complete';
+                  return (
+                    <div key={i} className="w-[6px] h-[6px] rounded-full transition-all"
+                         style={{ background: done ? accentColor : '#e2e8f0' }} />
+                  );
+                })}
+                {sessions.length > 8 && (
+                  <span className="text-[9px] text-slate-300 ml-0.5">+{sessions.length - 8}</span>
+                )}
+              </div>
+              <span className="text-[11px] text-slate-400">{completedCount}/{sessions.length} completed</span>
+              {avgScore !== null && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: `${accentColor}18`, color: accentColor }}>
+                  avg {avgScore}%
+                </span>
+              )}
+            </div>
+          ) : !loading ? (
+            <p className="text-[11px] text-slate-400 mt-0.5">No practice tests assigned</p>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          {!loading && sessions.length > 0 && (
+            <div className="relative w-12 h-12">
+              <svg viewBox="0 0 36 36" className="w-full h-full" style={{ transform: 'rotate(-90deg)' }}>
+                <circle cx="18" cy="18" r="14" fill="none" stroke="#f1f5f9" strokeWidth="4" />
+                <circle cx="18" cy="18" r="14" fill="none" stroke={accentColor} strokeWidth="4"
+                        pathLength="100"
+                        strokeDasharray={`${completionPct} 100`}
+                        strokeLinecap="round" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[10px] font-extrabold leading-none" style={{ color: accentColor }}>
+                  {completionPct}%
+                </span>
+              </div>
+            </div>
+          )}
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${expanded ? 'rotate-180' : ''}`}
+               style={{ background: expanded ? `${accentColor}18` : '#f3f4f6' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                 style={{ color: expanded ? accentColor : '#94a3b8' }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
         </div>
       </button>
 
       {/* ── Body ── */}
       {expanded && (
-        <div className="border-t-2 border-emerald-100">
+        <div style={{ borderTop: `1.5px solid ${accentColor}20`, background: 'linear-gradient(to bottom,#f8f9fb,#f5f6f8)' }}>
           {loading ? (
-            <div className="py-10 flex items-center justify-center gap-2.5 text-slate-400 text-sm bg-slate-50/40">
+            <div className="py-10 flex items-center justify-center gap-2.5 text-slate-400 text-sm">
               <span className="w-4 h-4 border-2 border-slate-200 border-t-emerald-500 rounded-full animate-spin" />
               Loading practice history…
             </div>
           ) : !hasData ? (
-            <div className="py-12 flex flex-col items-center gap-2 text-slate-400 bg-slate-50/40">
-              <span className="text-3xl opacity-40">📚</span>
-              <p className="text-sm">No practice tests taken yet.</p>
+            <div className="py-10 flex flex-col items-center gap-2 text-slate-400">
+              <span className="text-4xl opacity-20">📚</span>
+              <p className="text-sm font-medium">No practice tests taken yet</p>
             </div>
           ) : (
-            Object.entries(groups).map(([subject, topics]) => {
-              const pal = SUBJ_PALETTE[subject] || SUBJ_PALETTE.general;
-              return (
-                <div key={subject}>
-                  {/* Subject header */}
-                  <div className="px-5 py-2.5 flex items-center gap-2"
-                       style={{ background: `linear-gradient(135deg,${pal.from}18,${pal.to}28)`, borderBottom: `2px solid ${pal.from}22` }}>
-                    <div className="w-5 h-5 rounded-md flex items-center justify-center"
-                         style={{ background: pal.badge }}>
-                      <span className="text-[9px] font-black" style={{ color: pal.text }}>
-                        {subject === 'math' ? 'M' : subject === 'reading_writing' ? 'R' : 'G'}
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-extrabold uppercase tracking-[1.5px]"
-                          style={{ color: pal.text }}>
-                      {SUBJ_LABEL[subject] || subject}
-                    </span>
-                  </div>
-
-                  {Object.entries(topics).map(([topic, subTopics]) => (
-                    <div key={topic}>
-                      {/* Topic header */}
-                      <div className="px-5 py-2 flex items-center gap-2"
-                           style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', borderLeft: `3px solid ${pal.from}44` }}>
-                        <span className="text-[11px] font-bold text-slate-600">{topic}</span>
-                        <span className="text-[10px] text-slate-400">
-                          · {Object.values(subTopics).reduce((n, arr) => n + arr.length, 0)} attempts
-                        </span>
-                      </div>
-                      {Object.entries(subTopics).map(([subTopic, attempts]) => (
-                        <SubTopicRow key={subTopic} subTopic={subTopic} attempts={attempts}
-                                     onView={onView} viewLoadingId={viewLoadingId} accentColor={pal.from} />
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              );
-            })
+            <div className="p-4 space-y-2.5">
+              {Object.entries(groups).map(([subject, topics]) => {
+                const pal = SUBJ_PALETTE[subject] || SUBJ_PALETTE.general;
+                return (
+                  <SubjectSection key={subject} subject={subject} topics={topics}
+                                  pal={pal} onView={onView} viewLoadingId={viewLoadingId} />
+                );
+              })}
+            </div>
           )}
         </div>
       )}
@@ -1602,7 +1784,7 @@ function FullLengthResultModal({ result, onClose }) {
                           <span className="text-base shrink-0">💡</span>
                           <div>
                             <p className="text-[11px] font-extrabold text-amber-700 uppercase tracking-wide mb-1">Explanation</p>
-                            <MathContent html={sanitizeText(q.explanation)} className="text-[12px] text-amber-800 leading-relaxed [&_p]:m-0" />
+                            <MathContent html={boldChoiceLabels(sanitizeText(q.explanation))} className="text-[12px] text-amber-800 leading-relaxed [&_p]:m-0" />
                           </div>
                         </div>
                       </div>
@@ -1685,24 +1867,21 @@ function LoadingOverlay() {
 }
 
 export default function StudentProfile() {
-  const { id }   = useParams();
-  const navigate = useNavigate();
+  const { id }    = useParams();
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const basePath  = location.pathname.startsWith('/operations') ? '/operations' : '/mentor';
 
   const [student, setStudent]       = useState(null);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
-  const [activeTab, setActiveTab]   = useState('Overview');
+  const [activeTab, setActiveTab]   = useState(location.state?.tab || 'Overview');
   const [newNote, setNewNote]       = useState('');
   const [notes, setNotes]           = useState([]);
   const [adaptiveSessions,  setAdaptiveSessions]  = useState([]);
   const [practiceSessions,  setPracticeSessions]  = useState([]);
   const [satSessionsLoading, setSatSessionsLoading] = useState(true);
 
-  const [adaptiveResult, setAdaptiveResult]               = useState(null);
-  const [adaptiveResultLoading, setAdaptiveResultLoading] = useState(null);
-  const [practiceResult, setPracticeResult]               = useState(null);
-  const [practiceResultLoading, setPracticeResultLoading] = useState(null);
-  const [fullLengthResult, setFullLengthResult]           = useState(null);
   const [_studentAssignments, setStudentAssignments]      = useState([]);
 
   useEffect(() => {
@@ -1727,41 +1906,33 @@ export default function StudentProfile() {
     });
   }, [id]);
 
-  const handleViewAdaptiveResult = async (session) => {
-    if (adaptiveResultLoading) return;
-    setAdaptiveResultLoading(session._id);
-    try {
-      if (session.session_type === 'full_length') {
-        const res = await satMentorService.getFullLengthResults(session._id);
-        setFullLengthResult({ data: res.data });
-      } else {
-        const res = await satMentorService.getSessionResults(session._id);
-        setAdaptiveResult({ session: res.data, assignment: { exam_config_id: session.exam_config_id } });
-      }
-    } catch (err) {
-      console.error('[SAT] Failed to load session results:', err?.message || err);
-      if (session.session_type === 'full_length') {
-        setFullLengthResult(null);
-      } else {
-        setAdaptiveResult({ session: null, assignment: { exam_config_id: session.exam_config_id } });
-      }
-    } finally {
-      setAdaptiveResultLoading(null);
-    }
+  const handleViewAdaptiveResult = (session) => {
+    const type = session.session_type === 'full_length' ? 'full_length' : 'adaptive';
+    navigate(`${basePath}/students/${id}/result/${session._id}`, {
+      state: { type, examConfig: session.exam_config_id },
+    });
   };
 
-  const handleViewPracticeResult = async (session) => {
-    if (practiceResultLoading) return;
-    setPracticeResultLoading(session._id);
-    try {
-      const res = await satMentorService.getPracticeResults(session._id);
-      setPracticeResult({ session: res.data, config: session.practice_config_id });
-    } catch (err) {
-      console.error('[SAT] Failed to load practice results:', err?.message || err);
-      setPracticeResult({ session: null, config: session.practice_config_id });
-    } finally {
-      setPracticeResultLoading(null);
-    }
+  const handleViewSeriesResult = ({ series, math: mathSession, rw: rwSession, testType }) => {
+    const primaryIsMath = !!mathSession?._id;
+    const primaryId     = mathSession?._id || rwSession?._id;
+    const pairedId      = primaryIsMath ? rwSession?._id : null;
+    navigate(`${basePath}/students/${id}/result/${primaryId}`, {
+      state: {
+        type: 'adaptive_pair',
+        pairedSessionId: pairedId || undefined,
+        primaryIsMath,
+        isDiagnostic: testType === 'diagnostic',
+        seriesName: series,
+        examConfig: mathSession?.exam_config_id || rwSession?.exam_config_id,
+      },
+    });
+  };
+
+  const handleViewPracticeResult = (session) => {
+    navigate(`${basePath}/students/${id}/result/${session._id}`, {
+      state: { type: 'practice', practiceConfig: session.practice_config_id },
+    });
   };
 
   if (loading) {
@@ -2305,12 +2476,18 @@ export default function StudentProfile() {
 
                 {/* ── SAT Test History ── */}
                 <div className="flex flex-col gap-3 pt-1">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom,#6366f1,#a855f7)' }} />
-                      <p className="text-[13px] font-extrabold text-slate-800 tracking-tight">SAT Test History</p>
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                         style={{ background: 'linear-gradient(135deg,#6366f1,#a855f7)', boxShadow: '0 3px 10px rgba(99,102,241,0.35)' }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 3v18h18" /><path d="M7 16l4-4 4 4 4-8" />
+                      </svg>
                     </div>
-                    <div className="flex-1 h-px bg-gradient-to-r from-indigo-100 to-transparent" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-[15px] font-extrabold text-slate-800 tracking-tight leading-none">SAT Test History</h3>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Diagnostic · Mock · Practice</p>
+                    </div>
+                    <div className="h-px bg-gradient-to-r from-indigo-200 via-purple-100 to-transparent w-24 shrink-0" />
                   </div>
                   <SatTestSection
                     label="Diagnostic Tests"
@@ -2319,7 +2496,9 @@ export default function StudentProfile() {
                     sessions={diagnosticSessions}
                     loading={satSessionsLoading}
                     onView={handleViewAdaptiveResult}
-                    viewLoadingId={adaptiveResultLoading}
+                    onViewSeries={handleViewSeriesResult}
+                    testType="diagnostic"
+                    viewLoadingId={null}
                   />
                   <SatTestSection
                     label="Mock Tests"
@@ -2328,13 +2507,15 @@ export default function StudentProfile() {
                     sessions={mockSessions}
                     loading={satSessionsLoading}
                     onView={handleViewAdaptiveResult}
-                    viewLoadingId={adaptiveResultLoading}
+                    onViewSeries={handleViewSeriesResult}
+                    testType="mock"
+                    viewLoadingId={null}
                   />
                   <PracticeHistorySection
                     sessions={practiceSessions}
                     loading={satSessionsLoading}
                     onView={handleViewPracticeResult}
-                    viewLoadingId={practiceResultLoading}
+                    viewLoadingId={null}
                   />
                 </div>
 
@@ -2380,29 +2561,6 @@ export default function StudentProfile() {
         )}
       </div>
 
-      {(adaptiveResultLoading || practiceResultLoading) && <LoadingOverlay />}
-
-      {adaptiveResult && (
-        <SatScoreModal
-          session={adaptiveResult.session}
-          assignment={adaptiveResult.assignment}
-          onClose={() => setAdaptiveResult(null)}
-        />
-      )}
-
-      {fullLengthResult && (
-        <FullLengthResultModal
-          result={fullLengthResult}
-          onClose={() => setFullLengthResult(null)}
-        />
-      )}
-
-      {practiceResult && (
-        <PracticeResultModal
-          result={practiceResult}
-          onClose={() => setPracticeResult(null)}
-        />
-      )}
     </div>
   );
 }
