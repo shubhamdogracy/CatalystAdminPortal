@@ -686,7 +686,6 @@ const scoreBg    = pct => pct >= 80 ? '#ecfdf5' : pct >= 60 ? '#ecfeff' : pct >=
 
 function SatTestSection({ label, icon, accentColor, sessions, loading, onView, onViewSeries, testType, viewLoadingId }) {
   const [expanded, setExpanded] = useState(false);
-  const completed = sessions.filter(s => s.status === 'complete' || s.status === 'completed').length;
 
   const displayRows = useMemo(() => {
     const fullLengthRows = sessions
@@ -722,11 +721,16 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, o
       .sort((a, b) => b.latestAt - a.latestAt);
   }, [sessions]);
 
+  const isRowDone = row => row.type === 'series'
+    ? [...row.math, ...row.rw].every(s => s.status === 'complete' || s.status === 'completed')
+    : (row.session.status === 'complete' || row.session.status === 'completed');
+  const completed = displayRows.filter(isRowDone).length;
+
   const fmtDate = raw => raw
     ? new Date(raw).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
     : '';
 
-  const completionPct = sessions.length > 0 ? Math.round((completed / sessions.length) * 100) : 0;
+  const completionPct = displayRows.length > 0 ? Math.round((completed / displayRows.length) * 100) : 0;
 
   // Compute recent avg score for header display
   const recentScores = sessions
@@ -765,21 +769,18 @@ function SatTestSection({ label, icon, accentColor, sessions, loading, onView, o
         {/* Title + meta */}
         <div className="flex-1 min-w-0">
           <p className="text-[14px] font-bold text-slate-800 tracking-tight">{label}</p>
-          {!loading && sessions.length > 0 ? (
+          {!loading && displayRows.length > 0 ? (
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <div className="flex gap-[4px] items-center">
-                {sessions.slice(0, Math.min(sessions.length, 8)).map((s, i) => {
-                  const done = s.status === 'complete' || s.status === 'completed';
-                  return (
-                    <div key={i} className="w-[6px] h-[6px] rounded-full transition-all"
-                         style={{ background: done ? accentColor : '#e2e8f0' }} />
-                  );
-                })}
-                {sessions.length > 8 && (
-                  <span className="text-[9px] text-slate-300 ml-0.5">+{sessions.length - 8}</span>
+                {displayRows.slice(0, Math.min(displayRows.length, 8)).map((row, i) => (
+                  <div key={i} className="w-[6px] h-[6px] rounded-full transition-all"
+                       style={{ background: isRowDone(row) ? accentColor : '#e2e8f0' }} />
+                ))}
+                {displayRows.length > 8 && (
+                  <span className="text-[9px] text-slate-300 ml-0.5">+{displayRows.length - 8}</span>
                 )}
               </div>
-              <span className="text-[11px] text-slate-400">{completed}/{sessions.length} completed</span>
+              <span className="text-[11px] text-slate-400">{completed}/{displayRows.length} completed</span>
               {avgScore !== null && (
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
                       style={{ background: `${accentColor}18`, color: accentColor }}>
@@ -1968,6 +1969,30 @@ export default function StudentProfile() {
   );
   const totalTests = adaptiveSessions.length + practiceSessions.length;
 
+  // Count unique completed tests (groups series pairs as one test)
+  const countCompletedUniqueTests = (sess) => {
+    const seriesMap = {};
+    let count = 0;
+    sess.filter(s => s.session_type !== 'full_length').forEach(s => {
+      const name = s.exam_config_id?.name || '';
+      const match = name.match(SERIES_RE);
+      if (match) {
+        const series = name.replace(SERIES_RE, '').trim();
+        if (!seriesMap[series]) seriesMap[series] = [];
+        seriesMap[series].push(s);
+      } else {
+        if (s.status === 'complete' || s.status === 'completed') count++;
+      }
+    });
+    sess.filter(s => s.session_type === 'full_length').forEach(s => {
+      if (s.status === 'complete' || s.status === 'completed') count++;
+    });
+    Object.values(seriesMap).forEach(group => {
+      if (group.every(s => s.status === 'complete' || s.status === 'completed')) count++;
+    });
+    return count;
+  };
+
   // Per-category score averages (only completed sessions)
   const avgPct = (sessions) => {
     const done = sessions.filter(s => s.status === 'complete' || s.status === 'completed');
@@ -2210,19 +2235,19 @@ export default function StudentProfile() {
                   {diagnosticPct !== null && (
                     <ProgressTrack label="Diagnostic Tests" pct={diagnosticPct}
                       gradient="linear-gradient(90deg,#0891b2,#06b6d4,#22d3ee)"
-                      note={`${diagnosticSessions.filter(s => s.status === 'complete' || s.status === 'completed').length} completed`}
+                      note={`${countCompletedUniqueTests(diagnosticSessions)} completed`}
                       icon="🔬" />
                   )}
                   {mockPct !== null && (
                     <ProgressTrack label="Mock Tests" pct={mockPct}
                       gradient="linear-gradient(90deg,#7c3aed,#a855f7,#c084fc)"
-                      note={`${mockSessions.filter(s => s.status === 'complete' || s.status === 'completed').length} completed`}
+                      note={`${countCompletedUniqueTests(mockSessions)} completed`}
                       icon="📝" />
                   )}
                   {practicePct !== null && (
                     <ProgressTrack label="Practice Tests" pct={practicePct}
                       gradient="linear-gradient(90deg,#059669,#10b981,#34d399)"
-                      note={`${practiceSessions.filter(s => s.status === 'complete' || s.status === 'completed').length} completed`}
+                      note={`${countCompletedUniqueTests(practiceSessions)} completed`}
                       icon="📚" />
                   )}
                 </div>
