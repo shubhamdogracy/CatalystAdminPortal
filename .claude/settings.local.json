@@ -34,7 +34,9 @@
       "Bash(Select-Object -Property FullName, PSIsContainer)",
       "Bash(Format-Table -AutoSize)",
       "Bash(npx tsc *)",
-      "Bash(Remove-Item *)"
+      "Bash(Remove-Item *)",
+      "Bash(Select-Object -First 20)",
+      "Bash(Format-Table FullName)"
     ]
   }
 }
