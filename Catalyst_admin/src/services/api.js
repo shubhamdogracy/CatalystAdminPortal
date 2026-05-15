@@ -45,7 +45,7 @@ export const studentService = {
   create:       (payload)       => req('/students', { method: 'POST', body: JSON.stringify(payload) }),
   update:       (id, payload)   => req(`/students/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   remove:       (id)            => req(`/students/${id}`, { method: 'DELETE' }),
-  grantAccess:  (id)            => req(`/students/${id}/grant-access`, { method: 'PUT' }),
+  grantAccess:  (id, mentorId, subject) => req(`/students/${id}/grant-access`, { method: 'PUT', body: JSON.stringify({ mentorId: mentorId || undefined, subject: subject || undefined }) }),
 };
 
 
