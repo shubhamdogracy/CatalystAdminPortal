@@ -495,8 +495,8 @@ function TopicMasteryTable({ topicMastery }) {
 }
 
 // ── Score badge helpers ────────────────────────────────────────
-const scoreColor = pct => pct >= 80 ? '#059669' : pct >= 60 ? '#0891b2' : pct >= 40 ? '#d97706' : '#dc2626';
-const scoreBg    = pct => pct >= 80 ? '#ecfdf5' : pct >= 60 ? '#ecfeff' : pct >= 40 ? '#fffbeb' : '#fef2f2';
+// const scoreColor = pct => pct >= 80 ? '#059669' : pct >= 60 ? '#0891b2' : pct >= 40 ? '#d97706' : '#dc2626';
+// const scoreBg    = pct => pct >= 80 ? '#ecfdf5' : pct >= 60 ? '#ecfeff' : pct >= 40 ? '#fffbeb' : '#fef2f2';
 
 // ── SAT score utils (projected score from 4 modules) ──────────
 function getWeightedScore(breakdown = []) {
