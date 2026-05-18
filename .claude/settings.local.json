@@ -40,7 +40,10 @@
       "Bash(Select-Object FullName)",
       "Bash(git *)",
       "Bash(Select-Object -First 20 FullName)",
-      "Bash(xargs grep -l \"by-mentor\\\\|getByMentor\")"
+      "Bash(xargs grep -l \"by-mentor\\\\|getByMentor\")",
+      "Bash(Select-Object Name)",
+      "PowerShell(\\(Get-Content \"C:\\\\users\\\\shubham\\\\webstormprojects\\\\catalyst_admin\\\\Catalyst_admin\\\\src\\\\components\\\\mentor\\\\students\\\\StudentProfile.jsx\"\\) | Select-String -Pattern \"\\(Predicted|Topic Mastery|Exam Remaining|Badges\\)\" -CaseSensitive | Select-Object -First 20)",
+      "Bash(xargs grep -l \"Predicted SAT\\\\|SAT Exam Remaining\\\\|Level & Badges\")"
     ]
   }
 }
