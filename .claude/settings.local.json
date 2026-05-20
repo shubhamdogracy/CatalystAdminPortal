@@ -15,9 +15,6 @@
       "Bash(xargs grep -l -i \"examconfig\\\\|exam-config\\\\|ExamConfig\")",
       "Bash(grep -rn \"student\\\\|Student\" index.jsx App.jsx router.jsx --include=\"*.jsx\" --include=\"*.js\")",
       "Bash(cat index.jsx)",
-      "Bash(Remove-Item -Path \"C:\\\\Users\\\\Shubham\\\\WebstormProjects\\\\catalyst_admin\\\\Catalyst_admin\\\\src\\\\components\\\\mentor\\\\assignments\\\\SatAssignTab.jsx\" -Force)",
-      "Bash(Remove-Item -Path \"C:\\\\Users\\\\Shubham\\\\WebstormProjects\\\\catalyst_admin\\\\Catalyst_admin\\\\src\\\\components\\\\mentor\\\\assignments\\\\AssignmentsPage.jsx\" -Force)",
-      "Bash(Remove-Item -Path \"C:\\\\Users\\\\Shubham\\\\WebstormProjects\\\\catalyst_admin\\\\Catalyst_admin\\\\src\\\\components\\\\student\" -Recurse -Force)",
       "Bash(Write-Output \"Done\")",
       "PowerShell(Remove-Item *)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\users\\\\shubham\\\\webstormprojects\\\\catalyst_student_server\" -Recurse -Directory | Where-Object {$_.Name -match '^\\(routes|controllers|src\\)$'} | Select-Object -ExpandProperty FullName)",
@@ -42,7 +39,6 @@
       "Bash(Select-Object -First 20 FullName)",
       "Bash(xargs grep -l \"by-mentor\\\\|getByMentor\")",
       "Bash(Select-Object Name)",
-      "PowerShell(\\(Get-Content \"C:\\\\users\\\\shubham\\\\webstormprojects\\\\catalyst_admin\\\\Catalyst_admin\\\\src\\\\components\\\\mentor\\\\students\\\\StudentProfile.jsx\"\\) | Select-String -Pattern \"\\(Predicted|Topic Mastery|Exam Remaining|Badges\\)\" -CaseSensitive | Select-Object -First 20)",
       "Bash(xargs grep -l \"Predicted SAT\\\\|SAT Exam Remaining\\\\|Level & Badges\")"
     ]
   }
